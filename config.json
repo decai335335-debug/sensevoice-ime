@@ -12,5 +12,5 @@
   "min_record_seconds": 0.3,
   "max_record_seconds": 60,
   "min_rms": 0.003,
-  "push_to_talk_hotkey": "ctrl+`"
+  "push_to_talk_hotkey": "`"
 }

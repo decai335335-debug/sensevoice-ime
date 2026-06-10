@@ -67,7 +67,7 @@ Default:
 
 ### v0.3.0 - Push-To-Talk Hotkey
 
-The user wanted Ctrl+Backtick as a hold-to-record shortcut:
+The user wanted Backtick (grave key) as a hold-to-record shortcut:
 
 - Press and hold: start recording.
 - Release: stop recording.
@@ -80,21 +80,21 @@ Initial implementation used `keyboard.add_hotkey(... trigger_on_release=True)`, 
 - start recording
 - stop when either `grave` or `ctrl` is released
 
-The user-facing config remains:
+The user-facing config:
 
 ```json
-"push_to_talk_hotkey": "ctrl+`"
+"push_to_talk_hotkey": "`"
 ```
 
 Internally, backtick is normalized to `grave` for the Python `keyboard` package.
 
 ### v0.3.1 - Hotkey Conflict Documentation
 
-Observed that Codex may capture Ctrl+Backtick for its own terminal behavior. Added FAQ guidance explaining that app-level shortcuts can prevent the global listener from receiving the event, and users can change `push_to_talk_hotkey` in `config.json`.
+Observed that some apps may capture the grave key at a low level. Added FAQ guidance explaining that app-level shortcuts can prevent the global listener from receiving the event, and users can change `push_to_talk_hotkey` in `config.json`.
 
 ### v0.3.2 - Hotkey Suppression & Config Hardening
 
-Even with push-to-talk, apps like VS Code / Codex still intercepted Ctrl+Backtick because the global hotkey listener does not block the event from reaching the focused application. Added `suppress=True` to `keyboard.add_hotkey` so the combo is consumed before the active app sees it.
+Even with push-to-talk, focused apps could still intercept the grave key because the global hotkey listener does not block the event by default. Added `suppress=True` to `keyboard.add_hotkey` so the key is consumed before the active app sees it.
 
 Also hardened `config.json` defaults:
 
@@ -103,7 +103,7 @@ Also hardened `config.json` defaults:
 - `restore_clipboard`: false (opt-in to avoid surprising clipboard loss)
 - `append_space`: false (opt-in)
 
-Fixed `config.json` default `push_to_talk_hotkey` back to `ctrl+\`` (it had drifted to just `` ` `` during local testing).
+Fixed `config.json` default `push_to_talk_hotkey` to `` ` `` (single grave key).
 
 ## 3. Pitfalls
 
@@ -114,7 +114,7 @@ Fixed `config.json` default `push_to_talk_hotkey` back to `ctrl+\`` (it had drif
 | Quiet recordings generated false text | ASR can hallucinate short noise or silence | Added RMS threshold and skip logic | v0.2.1 |
 | ctrl+backtick cannot be parsed directly | Python `keyboard` package treats backtick specially in hotkey strings | Normalize backtick to `grave` | v0.3.0 |
 | Release event was not reliable enough | Combo hotkey release handling can be inconsistent | Use `on_press_key` and `on_release_key` for the trigger key and modifiers | v0.3.0 |
-| Codex and some apps capture Ctrl+Backtick | App-level shortcuts can run before the global listener | Document conflict and support changing `push_to_talk_hotkey` | v0.3.1 |
+| Some apps capture the grave key | App-level shortcuts can run before the global listener | Document conflict and support changing `push_to_talk_hotkey` | v0.3.1 |
 | Some apps do not accept synthetic paste | App security or focus state blocks `Ctrl+V` | Keep recognized text on clipboard and document administrator/focus workaround | v0.3.1 |
 | Hotkey still reaches focused app | `keyboard` default forwards the combo to the active window | Add `suppress=True` so the event is intercepted | v0.3.2 |
 | Default hotkey drifted to just backtick | Local testing changed `config.json` without updating docs | Restore default to `ctrl+\`` and document it clearly | v0.3.2 |
@@ -182,6 +182,6 @@ Without suppression, focused apps that already bind the same shortcut (e.g. VS C
 
 - It is not a native Windows IME driver.
 - It uses clipboard paste, so some apps may block or redirect paste.
-- Hotkeys can conflict with apps such as Codex that reserve Ctrl+Backtick at a lower level.
+- Hotkeys can conflict with apps that reserve the grave key at a lower level.
 - The console window must remain open.
 - Microphone selection is currently system-default only.

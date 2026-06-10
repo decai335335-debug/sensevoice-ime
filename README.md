@@ -40,7 +40,7 @@ Who this is for:
 | Phrase replacements | Fixes recurring vocabulary such as `SenseVoice`, `OpenWhispr`, `Markdown`, and custom project terms. |
 | Quiet audio skip | Prevents low-volume background noise from becoming accidental pasted text. |
 | Hotkey suppression | Prevents apps like VS Code or Codex from intercepting the push-to-talk shortcut. |
-| Configurable hotkeys | Lets users avoid conflicts with apps that already use Ctrl+Backtick. |
+| Configurable hotkeys | Lets users avoid conflicts with apps that already use the grave key. |
 
 ## 4. Installation
 
@@ -85,7 +85,7 @@ Open `config.json` and confirm:
 Default:
 
 ```json
-"push_to_talk_hotkey": "ctrl+`"
+"push_to_talk_hotkey": "`"
 ```
 
 The program internally maps the backtick key to `grave`, because the Python `keyboard` package names that key `grave` on Windows.
@@ -99,9 +99,9 @@ When to use: You want to enter text into Obsidian, a browser, a chat box, or ano
 1. Run `run.bat`.
 2. Wait until the console prints `[model] ready` and `[ready]`.
 3. Click the target input box so the cursor is active.
-4. Hold <kbd>Ctrl</kbd> + <kbd>`</kbd>.
+4. Hold <kbd>`</kbd> (backtick / grave key).
 5. Speak.
-6. Release <kbd>Ctrl</kbd> + <kbd>`</kbd>.
+6. Release <kbd>`</kbd>.
 7. Wait for `[transcribe] working...` and `[paste] sent to active input`.
 
 ### Scenario 2: Add Common Words
@@ -150,7 +150,7 @@ python sensevoice_ime.py --once 3 --no-paste
 | `device` | `auto` | Inference device. `auto` prefers `cuda:0` if available, otherwise `cpu`. |
 | `sample_rate` | `16000` | Microphone sample rate in Hz. |
 | `channels` | `1` | Number of recording channels. |
-| `push_to_talk_hotkey` | `ctrl+\`` | Hold this hotkey to record. |
+| `push_to_talk_hotkey` | `` ` `` | Hold this hotkey to record. |
 | `reload_phrases_hotkey` | `ctrl+alt+r` | Reload `phrases.json` without restarting. |
 | `open_phrases_hotkey` | `ctrl+alt+p` | Open `phrases.json` in the default editor. |
 | `paste_after_transcribe` | `true` | Automatically paste the result after recognition. |
@@ -205,11 +205,11 @@ python sensevoice_ime.py --once 3 --no-paste
 Q: Is text pasted immediately when I release the hotkey?
 A: Release stops recording immediately. The text appears after model inference finishes. The console should show `[recording] stopped`, then `[transcribe] working...`, then `[paste] sent to active input`.
 
-Q: Why does the hotkey no longer open Codex / VS Code terminal?
+Q: Why does the hotkey no longer trigger other apps?
 A: Starting from v0.3.2 the hotkey is **suppressed** before reaching the focused app. This prevents app-level shortcuts from conflicting with push-to-talk. If you prefer the old behavior, change `push_to_talk_hotkey` in `config.json` to a less common combo.
 
-Q: Ctrl+Backtick does not work in Codex or another app. Why?
-A: Some applications reserve Ctrl+Backtick for their own terminal or command panel. Even with suppression, the global listener may not receive the event if the app hooks the keyboard at a lower level. Change `push_to_talk_hotkey` in `config.json`, for example to `ctrl+shift+space`, then restart `run.bat`.
+Q: The backtick key does not trigger recording in some apps. Why?
+A: Some applications may capture the grave key at a lower keyboard-hook level. If suppression is not enough, change `push_to_talk_hotkey` in `config.json` to a combo such as `ctrl+shift+space`, then restart `run.bat`.
 
 Q: The cursor disappears or the target app loses focus.
 A: The target app may be reacting to the same hotkey. Use a less-conflicting hotkey and click the target input box again before recording.
@@ -240,7 +240,7 @@ Mid term:
 
 - Add a simple settings window for model path, microphone, hotkey, and phrase replacements.
 - Add better VAD so silence and short pauses are handled more naturally.
-- Add per-application hotkey profiles for apps like Codex that already use Ctrl+Backtick.
+- Add per-application hotkey profiles for apps that already use the grave key.
 
 Long term:
 
@@ -257,10 +257,10 @@ How to contribute:
 
 ### 0.3.2
 
-- Hotkey is now **suppressed** so focused applications (e.g. VS Code, Codex) do not intercept it.
+- Hotkey is now **suppressed** so focused applications do not intercept it.
 - Added `min_record_seconds` and `max_record_seconds` config options.
 - Added `restore_clipboard` and `append_space` config options.
-- Fixed default `push_to_talk_hotkey` back to `ctrl+\`` in `config.json`.
+- Fixed default `push_to_talk_hotkey` to `` ` `` (single grave key) in `config.json`.
 
 ### 0.3.1
 
@@ -270,7 +270,7 @@ How to contribute:
 ### 0.3.0
 
 - Replaced toggle recording with push-to-talk.
-- Default hotkey is Ctrl+Backtick.
+- Default hotkey is Backtick (grave key `).
 - Added lower-level press/release listening for more reliable stop-on-release behavior.
 
 ### 0.2.0

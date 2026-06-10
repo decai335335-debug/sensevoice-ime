@@ -196,7 +196,7 @@ class ImeApp:
 
     def print_help(self):
         print("SenseVoice IME MVP")
-        print(f"  Hold to record   : {self.config.get('push_to_talk_hotkey', 'ctrl+`')}")
+        print(f"  Hold to record   : {self.config.get('push_to_talk_hotkey', '`')}")
         print(f"  Reload phrases   : {self.config.get('reload_phrases_hotkey', 'ctrl+alt+r')}")
         print(f"  Open phrases     : {self.config.get('open_phrases_hotkey', 'ctrl+alt+p')}")
         print("  Quit             : esc")
@@ -207,7 +207,7 @@ class ImeApp:
         keyboard = require_import("keyboard")
         self.print_help()
         self.engine.load()
-        push_to_talk = self.config.get("push_to_talk_hotkey", "ctrl+`")
+        push_to_talk = self.config.get("push_to_talk_hotkey", "`")
         self.register_push_to_talk(keyboard, push_to_talk)
         keyboard.add_hotkey(self.config.get("reload_phrases_hotkey", "ctrl+alt+r"), self.reload_phrases)
         keyboard.add_hotkey(self.config.get("open_phrases_hotkey", "ctrl+alt+p"), self.open_phrases_file)

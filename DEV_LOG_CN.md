@@ -67,7 +67,7 @@ AutoModel(model="model/SenseVoiceSmall", trust_remote_code=False)
 
 ### v0.3.0 - 按键说话热键
 
-用户希望用 Ctrl+反引号作为按住录音的快捷键：
+用户希望用反引号（grave 键）作为按住录音的快捷键：
 
 - 按下并按住：开始录音。
 - 松开：停止录音。
@@ -80,21 +80,21 @@ AutoModel(model="model/SenseVoiceSmall", trust_remote_code=False)
 - 开始录音
 - 当 `grave` 或 `ctrl` 任一松开时停止
 
-面向用户的配置保持：
+面向用户的配置：
 
 ```json
-"push_to_talk_hotkey": "ctrl+`"
+"push_to_talk_hotkey": "`"
 ```
 
 内部将反引号统一映射为 `grave`，以适配 Python `keyboard` 包。
 
 ### v0.3.1 - 热键冲突文档
 
-观察到 Codex 可能会把 Ctrl+反引号占为自己的终端行为。新增 FAQ 说明：应用级快捷键可能阻止全局监听器收到事件，用户可以在 `config.json` 中修改 `push_to_talk_hotkey`。
+观察到某些应用可能会在低层面占用 grave 键。新增 FAQ 说明：应用级快捷键可能阻止全局监听器收到事件，用户可以在 `config.json` 中修改 `push_to_talk_hotkey`。
 
 ### v0.3.2 - 热键拦截与配置加固
 
-即使做了按键说话，VS Code / Codex 等应用仍会拦截 Ctrl+反引号，因为全局热键监听器默认不会阻止事件继续传到焦点应用。为 `keyboard.add_hotkey` 增加了 `suppress=True`，让组合键在到达活动应用之前就被消费掉。
+即使做了按键说话，某些应用仍会拦截 grave 键，因为全局热键监听器默认不会阻止事件继续传到焦点应用。为 `keyboard.add_hotkey` 增加了 `suppress=True`，让组合键在到达活动应用之前就被消费掉。
 
 同时加固了 `config.json` 默认值：
 
@@ -103,7 +103,7 @@ AutoModel(model="model/SenseVoiceSmall", trust_remote_code=False)
 - `restore_clipboard`: false（默认不恢复，避免意外丢失剪贴板内容）
 - `append_space`: false（默认不追加空格）
 
-修复了 `config.json` 中默认 `push_to_talk_hotkey` 被误改为仅反引号的问题，恢复为 `ctrl+\``。
+修复了 `config.json` 中默认 `push_to_talk_hotkey`，明确设定为 `` ` ``（单 grave 键）。
 
 ## 3. 踩坑记录
 
@@ -114,7 +114,7 @@ AutoModel(model="model/SenseVoiceSmall", trust_remote_code=False)
 | 安静录音产生虚假文字 | ASR 可能对短噪音或静音产生幻觉 | 添加 RMS 阈值和跳过逻辑 | v0.2.1 |
 | ctrl+反引号无法直接解析 | Python `keyboard` 包在热键字符串中对反引号有特殊处理 | 将反引号规范化为 `grave` | v0.3.0 |
 | 松开事件不够可靠 | 组合键松开处理可能不一致 | 对触发键和修饰键分别使用 `on_press_key` 和 `on_release_key` | v0.3.0 |
-| Codex 等应用占用 Ctrl+反引号 | 应用级快捷键可能在全局监听器之前执行 | 记录冲突并支持修改 `push_to_talk_hotkey` | v0.3.1 |
+| 某些应用占用 grave 键 | 应用级快捷键可能在全局监听器之前执行 | 记录冲突并支持修改 `push_to_talk_hotkey` | v0.3.1 |
 | 某些应用不接受模拟粘贴 | 应用安全策略或焦点状态阻止了 `Ctrl+V` | 保留识别结果在剪贴板，并文档化管理员权限/焦点 workaround | v0.3.1 |
 | 热键仍会传到焦点应用 | `keyboard` 默认会把组合键转发给活动窗口 | 添加 `suppress=True` 拦截事件 | v0.3.2 |
 | 默认热键被误改成仅反引号 | 本地测试时改了 `config.json` 但未同步文档 | 恢复默认值为 `ctrl+\`` 并在文档中明确说明 | v0.3.2 |
@@ -182,6 +182,6 @@ AutoModel(model="model/SenseVoiceSmall", trust_remote_code=False)
 
 - 它不是原生 Windows IME 驱动。
 - 使用剪贴板粘贴，某些应用可能会阻止或重定向粘贴操作。
-- 热键仍可能与在更低层面占用 Ctrl+反引号的应用（如 Codex）冲突。
+- 热键仍可能与在更低层面占用 grave 键的应用冲突。
 - 控制台窗口必须保持打开状态。
 - 目前只能选择系统默认麦克风。
