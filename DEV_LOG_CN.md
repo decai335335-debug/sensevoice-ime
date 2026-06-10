@@ -92,6 +92,15 @@ AutoModel(model="model/SenseVoiceSmall", trust_remote_code=False)
 
 观察到某些应用可能会在低层面占用 grave 键。新增 FAQ 说明：应用级快捷键可能阻止全局监听器收到事件，用户可以在 `config.json` 中修改 `push_to_talk_hotkey`。
 
+### v0.3.3 - 按键说话音效提示
+
+使用已有的 `sounddevice` + `numpy` 栈添加短蜂鸣提示音，让用户获得即时音频反馈：
+
+- **开始音**：880 Hz，0.08 秒（较高、短促）
+- **停止音**：440 Hz，0.12 秒（较低、略长）
+
+两者都通过 `sd.play(..., blocking=False)` 非阻塞播放，不会延迟录音或转写流程。可通过 `config.json` 中的 `sound_on_start` 和 `sound_on_stop` 开关控制。
+
 ### v0.3.2 - 热键拦截与配置加固
 
 即使做了按键说话，某些应用仍会拦截 grave 键，因为全局热键监听器默认不会阻止事件继续传到焦点应用。为 `keyboard.add_hotkey` 增加了 `suppress=True`，让组合键在到达活动应用之前就被消费掉。
@@ -116,6 +125,7 @@ AutoModel(model="model/SenseVoiceSmall", trust_remote_code=False)
 | 松开事件不够可靠 | 组合键松开处理可能不一致 | 对触发键和修饰键分别使用 `on_press_key` 和 `on_release_key` | v0.3.0 |
 | 某些应用占用 grave 键 | 应用级快捷键可能在全局监听器之前执行 | 记录冲突并支持修改 `push_to_talk_hotkey` | v0.3.1 |
 | 某些应用不接受模拟粘贴 | 应用安全策略或焦点状态阻止了 `Ctrl+V` | 保留识别结果在剪贴板，并文档化管理员权限/焦点 workaround | v0.3.1 |
+| 缺少录音状态的音频反馈 | 用户无法判断录音实际开始或停止的时刻 | 使用 `sounddevice` 生成非阻塞正弦波提示音 | v0.3.3 |
 | 热键仍会传到焦点应用 | `keyboard` 默认会把组合键转发给活动窗口 | 添加 `suppress=True` 拦截事件 | v0.3.2 |
 | 默认热键被误改成仅反引号 | 本地测试时改了 `config.json` 但未同步文档 | 恢复默认值为 `ctrl+\`` 并在文档中明确说明 | v0.3.2 |
 

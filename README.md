@@ -158,6 +158,8 @@ python sensevoice_ime.py --once 3 --no-paste
 | `restore_clipboard` | `false` | Restore the previous clipboard content after pasting. |
 | `min_record_seconds` | `0.3` | Minimum recording duration; shorter recordings are discarded. |
 | `max_record_seconds` | `60` | Maximum recording duration before forced stop. |
+| `sound_on_start` | `true` | Play a short beep when recording starts. |
+| `sound_on_stop` | `true` | Play a short beep when recording stops. |
 | `min_rms` | `0.003` | RMS volume threshold; quieter audio is skipped to avoid false recognition. |
 
 ## 7. Tech Stack / Toolchain / Dependencies
@@ -234,7 +236,7 @@ Near term:
 
 - Add a small tray icon so the console window is not required.
 - Add a hotkey conflict checker that warns when a chosen shortcut is likely to be captured by common apps.
-- Add optional sound cues for recording start and stop.
+- ~~Add optional sound cues for recording start and stop.~~ (Done in v0.3.3)
 
 Mid term:
 
@@ -254,6 +256,11 @@ How to contribute:
 - Improve paste behavior for apps that block synthetic `Ctrl+V`.
 
 ## 11. Changelog
+
+### 0.3.3
+
+- Added optional sound cues (beeps) for recording start (880 Hz) and stop (440 Hz).
+- Controlled by `sound_on_start` and `sound_on_stop` in `config.json`.
 
 ### 0.3.2
 

@@ -57,6 +57,17 @@ def apply_phrases(text, phrases):
 
 
 
+def play_beep(freq=880, duration=0.08, volume=0.25):
+    try:
+        import sounddevice as sd
+        sample_rate = 16000
+        t = np.linspace(0, duration, int(sample_rate * duration), endpoint=False)
+        wave = volume * np.sin(2 * np.pi * freq * t)
+        sd.play(wave, samplerate=sample_rate, blocking=False)
+    except Exception:
+        pass
+
+
 def normalize_hotkey_for_keyboard(hotkey):
     # The keyboard package names the backtick key "grave" on Windows.
     return str(hotkey).replace("`", "grave")
@@ -242,6 +253,8 @@ class ImeApp:
         if self.recorder.is_recording:
             return
         if self.recorder.start():
+            if self.config.get("sound_on_start", True):
+                play_beep(freq=880, duration=0.08)
             print("[recording] started")
             max_seconds = float(self.config.get("max_record_seconds", 60))
             threading.Timer(max_seconds, self.stop_recording_if_needed).start()
@@ -249,6 +262,8 @@ class ImeApp:
     def stop_recording_if_needed(self):
         if not self.recorder.is_recording:
             return
+        if self.config.get("sound_on_stop", True):
+            play_beep(freq=440, duration=0.12)
         wav_path, duration, rms = self.recorder.stop_to_wav()
         print(f"[recording] stopped after {duration:.1f}s, rms={rms:.4f}")
         min_seconds = float(self.config.get("min_record_seconds", 0.3))

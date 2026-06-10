@@ -158,6 +158,8 @@ python sensevoice_ime.py --once 3 --no-paste
 | `restore_clipboard` | `false` | 粘贴后是否恢复之前的剪贴板内容。 |
 | `min_record_seconds` | `0.3` | 最短录音时长；短于该时长的录音会被丢弃。 |
 | `max_record_seconds` | `60` | 最长录音时长，超过后强制停止。 |
+| `sound_on_start` | `true` | 开始录音时播放短提示音。 |
+| `sound_on_stop` | `true` | 停止录音时播放短提示音。 |
 | `min_rms` | `0.003` | RMS 音量阈值；更安静的音频会被跳过，避免误识别。 |
 
 ## 7. 技术栈 / 工具链 / 依赖
@@ -234,7 +236,7 @@ A：`sounddevice` 使用系统默认输入设备。运行 `python sensevoice_ime
 
 - 添加一个小托盘图标，让控制台窗口不必一直开着。
 - 添加热键冲突检测器，当所选快捷键可能被常见应用截获时发出警告。
-- 添加可选的录音开始/停止音效提示。
+- ~~添加可选的录音开始/停止音效提示。~~（v0.3.3 已完成）
 
 中期：
 
@@ -254,6 +256,11 @@ A：`sounddevice` 使用系统默认输入设备。运行 `python sensevoice_ime
 - 改进在阻止模拟 `Ctrl+V` 的应用中的粘贴行为。
 
 ## 11. 更新日志
+
+### 0.3.3
+
+- 新增可选的录音开始（880 Hz）和停止（440 Hz）提示音。
+- 可通过 `config.json` 中的 `sound_on_start` 和 `sound_on_stop` 开关控制。
 
 ### 0.3.2
 

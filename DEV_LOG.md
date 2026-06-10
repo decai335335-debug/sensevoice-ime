@@ -92,6 +92,15 @@ Internally, backtick is normalized to `grave` for the Python `keyboard` package.
 
 Observed that some apps may capture the grave key at a low level. Added FAQ guidance explaining that app-level shortcuts can prevent the global listener from receiving the event, and users can change `push_to_talk_hotkey` in `config.json`.
 
+### v0.3.3 - Sound Cues for Push-To-Talk
+
+Added short beep tones using the existing `sounddevice` + `numpy` stack so users get immediate audio feedback:
+
+- **Start tone**: 880 Hz, 0.08 s (higher, short)
+- **Stop tone**: 440 Hz, 0.12 s (lower, slightly longer)
+
+Both are non-blocking via `sd.play(..., blocking=False)` so they do not delay the recording or transcription pipeline. Controlled by `sound_on_start` and `sound_on_stop` in `config.json`.
+
 ### v0.3.2 - Hotkey Suppression & Config Hardening
 
 Even with push-to-talk, focused apps could still intercept the grave key because the global hotkey listener does not block the event by default. Added `suppress=True` to `keyboard.add_hotkey` so the key is consumed before the active app sees it.
@@ -116,6 +125,7 @@ Fixed `config.json` default `push_to_talk_hotkey` to `` ` `` (single grave key).
 | Release event was not reliable enough | Combo hotkey release handling can be inconsistent | Use `on_press_key` and `on_release_key` for the trigger key and modifiers | v0.3.0 |
 | Some apps capture the grave key | App-level shortcuts can run before the global listener | Document conflict and support changing `push_to_talk_hotkey` | v0.3.1 |
 | Some apps do not accept synthetic paste | App security or focus state blocks `Ctrl+V` | Keep recognized text on clipboard and document administrator/focus workaround | v0.3.1 |
+| Missing audio feedback for recording state | Users cannot tell when recording actually starts or stops | Generate non-blocking sine-wave beeps with `sounddevice` | v0.3.3 |
 | Hotkey still reaches focused app | `keyboard` default forwards the combo to the active window | Add `suppress=True` so the event is intercepted | v0.3.2 |
 | Default hotkey drifted to just backtick | Local testing changed `config.json` without updating docs | Restore default to `ctrl+\`` and document it clearly | v0.3.2 |
 
