@@ -1,0 +1,18 @@
+[
+  {
+    "spoken": "open whisper",
+    "replace": "OpenWhispr"
+  },
+  {
+    "spoken": "sense voice",
+    "replace": "SenseVoice"
+  },
+  {
+    "spoken": "马克达",
+    "replace": "Markdown"
+  },
+  {
+    "spoken": "奥比西迪安",
+    "replace": "Obsidian"
+  }
+]

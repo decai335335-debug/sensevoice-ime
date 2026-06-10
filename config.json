@@ -1,0 +1,16 @@
+{
+  "model_path": "model/SenseVoiceSmall",
+  "language": "auto",
+  "device": "auto",
+  "sample_rate": 16000,
+  "channels": 1,
+  "reload_phrases_hotkey": "ctrl+alt+r",
+  "open_phrases_hotkey": "ctrl+alt+p",
+  "paste_after_transcribe": true,
+  "append_space": false,
+  "restore_clipboard": false,
+  "min_record_seconds": 0.3,
+  "max_record_seconds": 60,
+  "min_rms": 0.003,
+  "push_to_talk_hotkey": "ctrl+`"
+}
