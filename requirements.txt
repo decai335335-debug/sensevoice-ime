@@ -7,3 +7,4 @@ keyboard>=0.13.5
 pyperclip>=1.11.0
 numpy
 transformers>=4.51.0
+torchaudio

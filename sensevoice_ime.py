@@ -1,4 +1,4 @@
-import argparse
+﻿import argparse
 from collections import deque
 from datetime import datetime
 import json
@@ -49,13 +49,35 @@ def load_phrases():
         replacement = str(item.get("replace", "")).strip()
         if spoken and replacement:
             phrases.append((spoken, replacement))
+    phrases.sort(key=lambda item: len(item[0]), reverse=True)
     return phrases
+
+
+def phrase_pattern(spoken):
+    escaped = re.escape(spoken)
+    if re.match(r"^[A-Za-z0-9]", spoken) or re.search(r"[A-Za-z0-9]$", spoken):
+        return rf"(?<![A-Za-z0-9]){escaped}(?![A-Za-z0-9])"
+    return escaped
 
 
 def apply_phrases(text, phrases):
     result = text
     for spoken, replacement in phrases:
-        result = re.sub(re.escape(spoken), replacement, result, flags=re.IGNORECASE)
+        result = re.sub(phrase_pattern(spoken), replacement, result, flags=re.IGNORECASE)
+    return result
+
+
+DISALLOWED_SCRIPT_RE = re.compile(r"[\u1100-\u11FF\u3130-\u318F\uAC00-\uD7AF\u3040-\u30FF\uFF66-\uFF9D]+")
+
+
+def sanitize_output_language(text, config):
+    if not bool(config.get("restrict_output_to_zh_en", True)):
+        return text
+    result = DISALLOWED_SCRIPT_RE.sub(" ", str(text or ""))
+    result = re.sub(r"\s+", " ", result).strip()
+    result = re.sub(r"\s+([，。！？、,.!?;:；：])", r"\1", result)
+    result = re.sub(r"([（(])\s+", r"\1", result)
+    result = re.sub(r"\s+([）)])", r"\1", result)
     return result
 
 
@@ -432,6 +454,7 @@ class ImeApp:
         self.recorder = Recorder(config)
         self.jobs = queue.Queue()
         self.busy = False
+        self.normalized_push_to_talk = None
 
     def print_help(self):
         print("SenseVoice IME MVP")
@@ -465,6 +488,7 @@ class ImeApp:
 
     def register_push_to_talk(self, keyboard, hotkey):
         normalized = normalize_hotkey_for_keyboard(hotkey)
+        self.normalized_push_to_talk = normalized
         # Register with suppress=True so the combo is intercepted before
         # focused applications (e.g. VS Code / Codex) can handle it.
         keyboard.add_hotkey(
@@ -475,7 +499,7 @@ class ImeApp:
         )
         keyboard.add_hotkey(
             normalized,
-            self.stop_recording_if_needed,
+            lambda: self.stop_recording_if_needed(force=False),
             suppress=True,
             trigger_on_release=True,
         )
@@ -493,11 +517,22 @@ class ImeApp:
                 play_sound(start_sound, default_freq=880, default_duration=0.08)
             print("[recording] started")
             max_seconds = float(self.config.get("max_record_seconds", 60))
-            threading.Timer(max_seconds, self.stop_recording_if_needed).start()
+            threading.Timer(max_seconds, lambda: self.stop_recording_if_needed(force=True)).start()
 
-    def stop_recording_if_needed(self):
+    def stop_recording_if_needed(self, force=False):
         if not self.recorder.is_recording:
             return
+        if not force:
+            debounce_seconds = float(self.config.get("hotkey_release_debounce_seconds", 0.12))
+            if debounce_seconds > 0:
+                time.sleep(debounce_seconds)
+            try:
+                keyboard = require_import("keyboard")
+                if self.normalized_push_to_talk and keyboard.is_pressed(self.normalized_push_to_talk):
+                    print("[hotkey] ignored release bounce")
+                    return
+            except Exception:
+                pass
         stop_sound = self.config.get("sound_on_stop", True)
         if stop_sound is not False:
             play_sound(stop_sound, default_freq=440, default_duration=0.12)
@@ -512,20 +547,22 @@ class ImeApp:
             print(f"[skip] audio too quiet, rms {rms:.4f} < {min_rms:.4f}")
             Path(wav_path).unlink(missing_ok=True)
             return
-        self.jobs.put(wav_path)
+        self.jobs.put((wav_path, duration, rms))
 
     def worker_loop(self):
         while True:
-            wav_path = self.jobs.get()
+            wav_path, duration, rms = self.jobs.get()
             self.busy = True
             try:
                 print("[transcribe] working...")
                 asr_text = self.engine.transcribe(wav_path)
-                asr_after_phrases = apply_phrases(asr_text, self.phrases)
+                asr_for_phrases = sanitize_output_language(asr_text, self.config)
+                asr_after_phrases = apply_phrases(asr_for_phrases, self.phrases)
                 with self.optimizer_lock:
                     optimizer_mode = self.text_optimizer.mode
                     optimizer_name = self.text_optimizer.name
                     text = self.text_optimizer.optimize(asr_after_phrases)
+                text = sanitize_output_language(text, self.config)
                 append_raw_transcript_log(self.config, {
                     "timestamp": datetime.now().isoformat(timespec="seconds"),
                     "duration_seconds": round(float(duration), 3),
@@ -533,6 +570,7 @@ class ImeApp:
                     "optimizer_mode": optimizer_mode,
                     "optimizer_name": optimizer_name,
                     "asr_raw": asr_text,
+                    "asr_sanitized": asr_for_phrases,
                     "asr_after_phrases": asr_after_phrases,
                     "final_text": text,
                 })
@@ -626,11 +664,13 @@ def record_once(config, seconds, paste):
         Path(wav_path).unlink(missing_ok=True)
         return
     asr_text = app.engine.transcribe(wav_path)
-    asr_after_phrases = apply_phrases(asr_text, app.phrases)
+    asr_for_phrases = sanitize_output_language(asr_text, config)
+    asr_after_phrases = apply_phrases(asr_for_phrases, app.phrases)
     with app.optimizer_lock:
         optimizer_mode = app.text_optimizer.mode
         optimizer_name = app.text_optimizer.name
         text = app.text_optimizer.optimize(asr_after_phrases)
+    text = sanitize_output_language(text, config)
     append_raw_transcript_log(config, {
         "timestamp": datetime.now().isoformat(timespec="seconds"),
         "duration_seconds": round(float(duration), 3),
@@ -638,6 +678,7 @@ def record_once(config, seconds, paste):
         "optimizer_mode": optimizer_mode,
         "optimizer_name": optimizer_name,
         "asr_raw": asr_text,
+        "asr_sanitized": asr_for_phrases,
         "asr_after_phrases": asr_after_phrases,
         "final_text": text,
     })
@@ -681,3 +722,4 @@ def main():
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

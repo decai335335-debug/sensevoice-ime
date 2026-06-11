@@ -22,5 +22,7 @@
   "text_optimizer_max_new_tokens": 128,
   "pre_roll_seconds": 0.5,
   "log_raw_transcripts": true,
-  "raw_transcripts_path": "raw_transcripts.jsonl"
+  "raw_transcripts_path": "raw_transcripts.jsonl",
+  "restrict_output_to_zh_en": true,
+  "hotkey_release_debounce_seconds": 0.12
 }

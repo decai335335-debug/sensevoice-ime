@@ -1,4 +1,29 @@
-﻿# SenseVoice IME DEV_LOG
+# SenseVoice IME DEV_LOG
+
+## 1.1.0 - Hotword Library, Raw Logs, And Recording Stability
+
+Date: 2026-06-11
+
+### Added
+
+- Added raw transcript logging to `raw_transcripts.jsonl`, including pre-Qwen ASR fields and final output.
+- Added `pre_roll_seconds`, defaulting to 0.5 seconds, to avoid clipping the first spoken words.
+- Added `restrict_output_to_zh_en` to remove accidental Korean/Japanese script hallucinations from auto language detection.
+- Added `hotkey_release_debounce_seconds` to reduce random stop events while holding the push-to-talk key.
+- Added stronger GitHub hotword corrections and expanded `phrases.json` to 417 tracked hotword rules.
+
+### Fixed
+
+- Fixed missing `duration` / `rms` metadata in the worker queue when writing raw logs.
+- Fixed `run.bat` / `setup.bat` to prefer `.venv`.
+- Fixed missing `torchaudio` dependency required by FunASR.
+- Fixed phrase replacement ordering by applying longer rules first.
+- Fixed repeated replacements inside already-correct English terms, such as `GitHub` becoming `GitGitHub`.
+
+### Notes
+
+- `phrases.json` is tracked and uploaded as the shared project hotword library.
+- `raw_transcripts.jsonl` remains ignored because it contains private dictation logs.
 
 ## 1.0.0 - Local LLM Text Optimization Release
 

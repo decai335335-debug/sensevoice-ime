@@ -1,4 +1,29 @@
-﻿# SenseVoice IME 开发日志
+# SenseVoice IME 开发日志
+
+## 1.1.0 - 热词库、原始日志与录音稳定性版本
+
+日期：2026-06-11
+
+### 新增
+
+- 新增 原始识别日志 `raw_transcripts.jsonl`，记录 Qwen 优化前的 `asr_raw`、`asr_sanitized`、`asr_after_phrases` 和最终输出。
+- 新增 预录音缓冲 `pre_roll_seconds`，默认 0.5 秒，减少按下热键后立即说话导致开头被截断。
+- 新增 输出语言限制 `restrict_output_to_zh_en`，过滤 SenseVoice 自动语言检测误产生的韩文/日文假字符。
+- 新增 热键释放防抖 `hotkey_release_debounce_seconds`，减少长按录音时随机停止。
+- 新增 GitHub 强纠错热词和大规模个人技术热词库，`phrases.json` 扩展到 417 条并随仓库上传。
+
+### 修复
+
+- 修复 `duration` / `rms` 未传入后台 worker，导致识别完成后写日志时报错的问题。
+- 修复 `run.bat` / `setup.bat` 查找 `venv` 而不是 `.venv` 的问题。
+- 修复缺少 `torchaudio` 导致 FunASR 无法导入的问题。
+- 修复短热词优先匹配破坏长热词的问题，改为长词优先。
+- 修复英文热词在已替换结果内部重复命中，避免 `GitHub` 变成 `GitGitHub`。
+
+### 说明
+
+- `phrases.json` 是项目热词库，继续作为仓库文件上传。
+- `raw_transcripts.jsonl` 是个人识别日志，继续被 `.gitignore` 忽略。
 
 ## 1.0.0 - 本地 LLM 文本优化版本
 

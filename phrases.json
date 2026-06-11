@@ -1,146 +1,1670 @@
 [
-    {
-        "spoken":  "open whisper",
-        "replace":  "OpenWhispr"
-    },
-    {
-        "spoken":  "sense voice",
-        "replace":  "SenseVoice"
-    },
-    {
-        "spoken":  "马克达",
-        "replace":  "Markdown"
-    },
-    {
-        "spoken":  "奥比西迪安",
-        "replace":  "Obsidian"
-    },
-    {
-        "spoken":  "vibe coding",
-        "replace":  "vibe coding"
-    },
-    {
-        "spoken":  "claude",
-        "replace":  "Claude"
-    },
-    {
-        "spoken":  "codex",
-        "replace":  "Codex"
-    },
-    {
-        "spoken":  "deep seek",
-        "replace":  "DeepSeek"
-    },
-    {
-        "spoken":  "deepseek",
-        "replace":  "DeepSeek"
-    },
-    {
-        "spoken":  "kimi",
-        "replace":  "Kimi"
-    },
-    {
-        "spoken":  "github",
-        "replace":  "GitHub"
-    },
-    {
-        "spoken":  "git hub",
-        "replace":  "GitHub"
-    },
-    {
-        "spoken":  "perforce",
-        "replace":  "Perforce"
-    },
-    {
-        "spoken":  "文件资源管理器",
-        "replace":  "文件资源管理器"
-    },
-    {
-        "spoken":  "资源管理器",
-        "replace":  "文件资源管理器"
-    },
-    {
-        "spoken":  "file explorer",
-        "replace":  "文件资源管理器"
-    },
-    {
-        "spoken":  "bilibili",
-        "replace":  "Bilibili"
-    },
-    {
-        "spoken":  "b站",
-        "replace":  "Bilibili"
-    },
-    {
-        "spoken":  "youtube",
-        "replace":  "YouTube"
-    },
-    {
-        "spoken":  "you tube",
-        "replace":  "YouTube"
-    },
-    {
-        "spoken":  "gmail",
-        "replace":  "Gmail"
-    },
-    {
-        "spoken":  "g mail",
-        "replace":  "Gmail"
-    },
-    {
-        "spoken":  "repositories",
-        "replace":  "repositories"
-    },
-    {
-        "spoken":  "repository",
-        "replace":  "repository"
-    },
-    {
-        "spoken":  "repo",
-        "replace":  "repo"
-    },
-    {
-        "spoken":  "repos",
-        "replace":  "repos"
-    },
-    {
-        "spoken":  "模型",
-        "replace":  "模型"
-    },
-    {
-        "spoken":  "大模型",
-        "replace":  "大模型"
-    },
-    {
-        "spoken":  "语言模型",
-        "replace":  "语言模型"
-    },
-    {
-        "spoken":  "large language model",
-        "replace":  "large language model"
-    },
-    {
-        "spoken":  "llm",
-        "replace":  "LLM"
-    },
-    {
-        "spoken":  "wible coding",
-        "replace":  "vibe coding"
-    },
-    {
-        "spoken":  "weeble coding",
-        "replace":  "vibe coding"
-    },
-    {
-        "spoken":  "vibes coding",
-        "replace":  "vibe coding"
-    },
-    {
-        "spoken":  "vibing coding",
-        "replace":  "vibe coding"
-    },
-    {
-        "spoken":  "viber coding",
-        "replace":  "vibe coding"
-    }
+  {
+    "spoken": "zero point six b",
+    "replace": "0.6B"
+  },
+  {
+    "spoken": "零点六 b",
+    "replace": "0.6B"
+  },
+  {
+    "spoken": "one point seven b",
+    "replace": "1.7B"
+  },
+  {
+    "spoken": "一点七 b",
+    "replace": "1.7B"
+  },
+  {
+    "spoken": "a2a",
+    "replace": "A2A"
+  },
+  {
+    "spoken": "abilitysystemcomponent",
+    "replace": "AbilitySystemComponent"
+  },
+  {
+    "spoken": "actor",
+    "replace": "Actor"
+  },
+  {
+    "spoken": "agent",
+    "replace": "Agent"
+  },
+  {
+    "spoken": "agentic engineering",
+    "replace": "Agentic Engineering"
+  },
+  {
+    "spoken": "ai",
+    "replace": "AI"
+  },
+  {
+    "spoken": "ai python for beginners",
+    "replace": "AI Python for Beginners"
+  },
+  {
+    "spoken": "ai controller",
+    "replace": "AIController"
+  },
+  {
+    "spoken": "aicontroller",
+    "replace": "AIController"
+  },
+  {
+    "spoken": "aim offset",
+    "replace": "Aim Offset"
+  },
+  {
+    "spoken": "alignment",
+    "replace": "Alignment"
+  },
+  {
+    "spoken": "ambient",
+    "replace": "Ambient"
+  },
+  {
+    "spoken": "animation montage",
+    "replace": "Animation Montage"
+  },
+  {
+    "spoken": "anthropic",
+    "replace": "Anthropic"
+  },
+  {
+    "spoken": "api",
+    "replace": "API"
+  },
+  {
+    "spoken": "A S R",
+    "replace": "ASR"
+  },
+  {
+    "spoken": "asset",
+    "replace": "Asset"
+  },
+  {
+    "spoken": "async",
+    "replace": "Async"
+  },
+  {
+    "spoken": "attenuation",
+    "replace": "Attenuation"
+  },
+  {
+    "spoken": "attribute set",
+    "replace": "AttributeSet"
+  },
+  {
+    "spoken": "attributeset",
+    "replace": "AttributeSet"
+  },
+  {
+    "spoken": "audio import",
+    "replace": "Audio Import"
+  },
+  {
+    "spoken": "auto gen",
+    "replace": "AutoGen"
+  },
+  {
+    "spoken": "autogen",
+    "replace": "AutoGen"
+  },
+  {
+    "spoken": "await",
+    "replace": "Await"
+  },
+  {
+    "spoken": "background task",
+    "replace": "Background Task"
+  },
+  {
+    "spoken": "bake",
+    "replace": "Bake"
+  },
+  {
+    "spoken": "bank",
+    "replace": "Bank"
+  },
+  {
+    "spoken": "beat",
+    "replace": "Beat"
+  },
+  {
+    "spoken": "beginoverlap",
+    "replace": "BeginOverlap"
+  },
+  {
+    "spoken": "bilibili",
+    "replace": "Bilibili"
+  },
+  {
+    "spoken": "b站",
+    "replace": "Bilibili"
+  },
+  {
+    "spoken": "哔哩哔哩",
+    "replace": "bilibili"
+  },
+  {
+    "spoken": "binding",
+    "replace": "Binding"
+  },
+  {
+    "spoken": "bit depth",
+    "replace": "Bit Depth"
+  },
+  {
+    "spoken": "black board",
+    "replace": "Blackboard"
+  },
+  {
+    "spoken": "blackboard",
+    "replace": "Blackboard"
+  },
+  {
+    "spoken": "blend",
+    "replace": "Blend"
+  },
+  {
+    "spoken": "blend space",
+    "replace": "Blend Space"
+  },
+  {
+    "spoken": "bleu",
+    "replace": "BLEU"
+  },
+  {
+    "spoken": "blockalldynamic",
+    "replace": "BlockAllDynamic"
+  },
+  {
+    "spoken": "bloom",
+    "replace": "Bloom"
+  },
+  {
+    "spoken": "blueprint",
+    "replace": "Blueprint"
+  },
+  {
+    "spoken": "blueprint callable",
+    "replace": "BlueprintCallable"
+  },
+  {
+    "spoken": "blueprint pure",
+    "replace": "BlueprintPure"
+  },
+  {
+    "spoken": "bone",
+    "replace": "Bone"
+  },
+  {
+    "spoken": "bug",
+    "replace": "Bug"
+  },
+  {
+    "spoken": "camera cut",
+    "replace": "Camera Cut"
+  },
+  {
+    "spoken": "cd",
+    "replace": "CD"
+  },
+  {
+    "spoken": "celery",
+    "replace": "Celery"
+  },
+  {
+    "spoken": "chain-of-thought",
+    "replace": "Chain-of-Thought"
+  },
+  {
+    "spoken": "channel",
+    "replace": "Channel"
+  },
+  {
+    "spoken": "chat G",
+    "replace": "ChatGPT"
+  },
+  {
+    "spoken": "chat g p t",
+    "replace": "ChatGPT"
+  },
+  {
+    "spoken": "chat GPD",
+    "replace": "ChatGPT"
+  },
+  {
+    "spoken": "chat GPT",
+    "replace": "ChatGPT"
+  },
+  {
+    "spoken": "chatgpt",
+    "replace": "ChatGPT"
+  },
+  {
+    "spoken": "chat吉普蒂",
+    "replace": "ChatGPT"
+  },
+  {
+    "spoken": "chroma",
+    "replace": "Chroma"
+  },
+  {
+    "spoken": "chunk size",
+    "replace": "Chunk Size"
+  },
+  {
+    "spoken": "chunk size 512",
+    "replace": "Chunk Size 512"
+  },
+  {
+    "spoken": "ci",
+    "replace": "CI"
+  },
+  {
+    "spoken": "claude",
+    "replace": "Claude"
+  },
+  {
+    "spoken": "克劳德",
+    "replace": "Claude"
+  },
+  {
+    "spoken": "claude code",
+    "replace": "Claude Code"
+  },
+  {
+    "spoken": "cloud code",
+    "replace": "Claude Code"
+  },
+  {
+    "spoken": "codex",
+    "replace": "Codex"
+  },
+  {
+    "spoken": "collision preset",
+    "replace": "Collision Preset"
+  },
+  {
+    "spoken": "component",
+    "replace": "Component"
+  },
+  {
+    "spoken": "constraint",
+    "replace": "Constraint"
+  },
+  {
+    "spoken": "context",
+    "replace": "CONTEXT"
+  },
+  {
+    "spoken": "context compact",
+    "replace": "Context Compact"
+  },
+  {
+    "spoken": "cookie",
+    "replace": "Cookie"
+  },
+  {
+    "spoken": "cooking",
+    "replace": "Cooking"
+  },
+  {
+    "spoken": "cooldown",
+    "replace": "Cooldown"
+  },
+  {
+    "spoken": "coze",
+    "replace": "Coze"
+  },
+  {
+    "spoken": "扣子",
+    "replace": "Coze"
+  },
+  {
+    "spoken": "creativity",
+    "replace": "Creativity"
+  },
+  {
+    "spoken": "crew ai",
+    "replace": "CrewAI"
+  },
+  {
+    "spoken": "crewai",
+    "replace": "CrewAI"
+  },
+  {
+    "spoken": "cron scheduler",
+    "replace": "Cron Scheduler"
+  },
+  {
+    "spoken": "ctrl",
+    "replace": "Ctrl"
+  },
+  {
+    "spoken": "curve table",
+    "replace": "Curve Table"
+  },
+  {
+    "spoken": "damage type",
+    "replace": "Damage Type"
+  },
+  {
+    "spoken": "data table",
+    "replace": "Data Table"
+  },
+  {
+    "spoken": "dataclass",
+    "replace": "Dataclass"
+  },
+  {
+    "spoken": "decorator",
+    "replace": "Decorator"
+  },
+  {
+    "spoken": "deep research",
+    "replace": "Deep Research"
+  },
+  {
+    "spoken": "deep seek",
+    "replace": "DeepSeek"
+  },
+  {
+    "spoken": "deep sick",
+    "replace": "DeepSeek"
+  },
+  {
+    "spoken": "deepseek",
+    "replace": "DeepSeek"
+  },
+  {
+    "spoken": "深度求索",
+    "replace": "DeepSeek"
+  },
+  {
+    "spoken": "delegate",
+    "replace": "Delegate"
+  },
+  {
+    "spoken": "dependency injection",
+    "replace": "Dependency Injection"
+  },
+  {
+    "spoken": "diagnose",
+    "replace": "Diagnose"
+  },
+  {
+    "spoken": "dialogue",
+    "replace": "Dialogue"
+  },
+  {
+    "spoken": "dify",
+    "replace": "Dify"
+  },
+  {
+    "spoken": "dim01",
+    "replace": "Dim01"
+  },
+  {
+    "spoken": "direction",
+    "replace": "Direction"
+  },
+  {
+    "spoken": "docker",
+    "replace": "Docker"
+  },
+  {
+    "spoken": "dpi",
+    "replace": "DPI"
+  },
+  {
+    "spoken": "dpo",
+    "replace": "DPO"
+  },
+  {
+    "spoken": "ducking",
+    "replace": "Ducking"
+  },
+  {
+    "spoken": "embedding",
+    "replace": "Embedding"
+  },
+  {
+    "spoken": "enhanced input",
+    "replace": "Enhanced Input"
+  },
+  {
+    "spoken": "erp",
+    "replace": "ERP"
+  },
+  {
+    "spoken": "evals",
+    "replace": "Evals"
+  },
+  {
+    "spoken": "event",
+    "replace": "Event"
+  },
+  {
+    "spoken": "event driven",
+    "replace": "Event Driven"
+  },
+  {
+    "spoken": "excel",
+    "replace": "Excel"
+  },
+  {
+    "spoken": "execution calculation",
+    "replace": "Execution Calculation"
+  },
+  {
+    "spoken": "exit cue",
+    "replace": "Exit Cue"
+  },
+  {
+    "spoken": "fastapi",
+    "replace": "FastAPI"
+  },
+  {
+    "spoken": "fastmcp",
+    "replace": "FastMCP"
+  },
+  {
+    "spoken": "few-shot",
+    "replace": "Few-shot"
+  },
+  {
+    "spoken": "fine-tune",
+    "replace": "Fine-tune"
+  },
+  {
+    "spoken": "fixture",
+    "replace": "Fixture"
+  },
+  {
+    "spoken": "floating mp3 player",
+    "replace": "Floating MP3 Player"
+  },
+  {
+    "spoken": "function calling",
+    "replace": "Function Calling"
+  },
+  {
+    "spoken": "fx",
+    "replace": "FX"
+  },
+  {
+    "spoken": "fx random",
+    "replace": "FX Random"
+  },
+  {
+    "spoken": "game object",
+    "replace": "Game Object"
+  },
+  {
+    "spoken": "gameplay effect",
+    "replace": "Gameplay Effect"
+  },
+  {
+    "spoken": "gameplay tag",
+    "replace": "Gameplay Tag"
+  },
+  {
+    "spoken": "gameplay ability",
+    "replace": "GameplayAbility"
+  },
+  {
+    "spoken": "gameplayability",
+    "replace": "GameplayAbility"
+  },
+  {
+    "spoken": "garbage collection",
+    "replace": "Garbage Collection"
+  },
+  {
+    "spoken": "gas",
+    "replace": "GAS"
+  },
+  {
+    "spoken": "gemini",
+    "replace": "Gemini"
+  },
+  {
+    "spoken": "generator",
+    "replace": "Generator"
+  },
+  {
+    "spoken": "generous mvp",
+    "replace": "Generous MVP"
+  },
+  {
+    "spoken": "git",
+    "replace": "Git"
+  },
+  {
+    "spoken": "g hub",
+    "replace": "GitHub"
+  },
+  {
+    "spoken": "G up",
+    "replace": "GitHub"
+  },
+  {
+    "spoken": "gee hub",
+    "replace": "GitHub"
+  },
+  {
+    "spoken": "get hub",
+    "replace": "GitHub"
+  },
+  {
+    "spoken": "gethub",
+    "replace": "GitHub"
+  },
+  {
+    "spoken": "git hub",
+    "replace": "GitHub"
+  },
+  {
+    "spoken": "github",
+    "replace": "GitHub"
+  },
+  {
+    "spoken": "Good hub",
+    "replace": "GitHub"
+  },
+  {
+    "spoken": "good hub",
+    "replace": "GitHub"
+  },
+  {
+    "spoken": "Goodub",
+    "replace": "GitHub"
+  },
+  {
+    "spoken": "goodub",
+    "replace": "GitHub"
+  },
+  {
+    "spoken": "Gup",
+    "replace": "GitHub"
+  },
+  {
+    "spoken": "hub",
+    "replace": "GitHub"
+  },
+  {
+    "spoken": "他 hub",
+    "replace": "GitHub"
+  },
+  {
+    "spoken": "他hub",
+    "replace": "GitHub"
+  },
+  {
+    "spoken": "기 hub",
+    "replace": "GitHub"
+  },
+  {
+    "spoken": "기他 hub",
+    "replace": "GitHub"
+  },
+  {
+    "spoken": "기他hub",
+    "replace": "GitHub"
+  },
+  {
+    "spoken": "hub 上",
+    "replace": "GitHub 上"
+  },
+  {
+    "spoken": "G up上",
+    "replace": "GitHub上"
+  },
+  {
+    "spoken": "Goodub上",
+    "replace": "GitHub上"
+  },
+  {
+    "spoken": "hub上",
+    "replace": "GitHub上"
+  },
+  {
+    "spoken": "기 hub上",
+    "replace": "GitHub上"
+  },
+  {
+    "spoken": "g mail",
+    "replace": "Gmail"
+  },
+  {
+    "spoken": "gmail",
+    "replace": "Gmail"
+  },
+  {
+    "spoken": "go dot",
+    "replace": "Godot"
+  },
+  {
+    "spoken": "godot",
+    "replace": "Godot"
+  },
+  {
+    "spoken": "高德",
+    "replace": "Godot"
+  },
+  {
+    "spoken": "graph rag",
+    "replace": "Graph RAG"
+  },
+  {
+    "spoken": "grill me",
+    "replace": "Grill Me"
+  },
+  {
+    "spoken": "gtd",
+    "replace": "GTD"
+  },
+  {
+    "spoken": "hallucination",
+    "replace": "Hallucination"
+  },
+  {
+    "spoken": "health",
+    "replace": "Health"
+  },
+  {
+    "spoken": "hit reaction",
+    "replace": "Hit Reaction"
+  },
+  {
+    "spoken": "horizontal slice",
+    "replace": "Horizontal Slice"
+  },
+  {
+    "spoken": "human-in-the-loop",
+    "replace": "Human-in-the-Loop"
+  },
+  {
+    "spoken": "hybrid search",
+    "replace": "Hybrid Search"
+  },
+  {
+    "spoken": "ik",
+    "replace": "IK"
+  },
+  {
+    "spoken": "improve codebase architecture",
+    "replace": "Improve Codebase Architecture"
+  },
+  {
+    "spoken": "inference",
+    "replace": "Inference"
+  },
+  {
+    "spoken": "input mapping context",
+    "replace": "Input Mapping Context"
+  },
+  {
+    "spoken": "input action",
+    "replace": "InputAction"
+  },
+  {
+    "spoken": "jailbreak",
+    "replace": "Jailbreak"
+  },
+  {
+    "spoken": "key",
+    "replace": "Key"
+  },
+  {
+    "spoken": "key me",
+    "replace": "Kimi"
+  },
+  {
+    "spoken": "kimi",
+    "replace": "Kimi"
+  },
+  {
+    "spoken": "奇米",
+    "replace": "Kimi"
+  },
+  {
+    "spoken": "knowledge graph",
+    "replace": "Knowledge Graph"
+  },
+  {
+    "spoken": "kokoro",
+    "replace": "Kokoro"
+  },
+  {
+    "spoken": "kpi",
+    "replace": "KPI"
+  },
+  {
+    "spoken": "landscape",
+    "replace": "Landscape"
+  },
+  {
+    "spoken": "lang chain",
+    "replace": "LangChain"
+  },
+  {
+    "spoken": "langchain",
+    "replace": "LangChain"
+  },
+  {
+    "spoken": "浪链",
+    "replace": "LangChain"
+  },
+  {
+    "spoken": "lang graph",
+    "replace": "LangGraph"
+  },
+  {
+    "spoken": "langgraph",
+    "replace": "LangGraph"
+  },
+  {
+    "spoken": "浪图",
+    "replace": "LangGraph"
+  },
+  {
+    "spoken": "line trace",
+    "replace": "Line Trace"
+  },
+  {
+    "spoken": "llama",
+    "replace": "Llama"
+  },
+  {
+    "spoken": "L L M",
+    "replace": "LLM"
+  },
+  {
+    "spoken": "llm",
+    "replace": "LLM"
+  },
+  {
+    "spoken": "大模型",
+    "replace": "LLM"
+  },
+  {
+    "spoken": "log",
+    "replace": "Log"
+  },
+  {
+    "spoken": "lora",
+    "replace": "LoRA"
+  },
+  {
+    "spoken": "loudness",
+    "replace": "Loudness"
+  },
+  {
+    "spoken": "make it stick",
+    "replace": "Make It Stick"
+  },
+  {
+    "spoken": "map",
+    "replace": "Map"
+  },
+  {
+    "spoken": "马克达",
+    "replace": "Markdown"
+  },
+  {
+    "spoken": "mastering",
+    "replace": "Mastering"
+  },
+  {
+    "spoken": "mate-engine",
+    "replace": "Mate-Engine"
+  },
+  {
+    "spoken": "material layer",
+    "replace": "Material Layer"
+  },
+  {
+    "spoken": "em see pee",
+    "replace": "MCP"
+  },
+  {
+    "spoken": "mcb",
+    "replace": "MCP"
+  },
+  {
+    "spoken": "mcp",
+    "replace": "MCP"
+  },
+  {
+    "spoken": "md",
+    "replace": "MD"
+  },
+  {
+    "spoken": "merge",
+    "replace": "Merge"
+  },
+  {
+    "spoken": "message",
+    "replace": "Message"
+  },
+  {
+    "spoken": "metaclass",
+    "replace": "Metaclass"
+  },
+  {
+    "spoken": "milvus",
+    "replace": "Milvus"
+  },
+  {
+    "spoken": "miner you",
+    "replace": "MinerU"
+  },
+  {
+    "spoken": "mineru",
+    "replace": "MinerU"
+  },
+  {
+    "spoken": "mixing",
+    "replace": "Mixing"
+  },
+  {
+    "spoken": "mock",
+    "replace": "Mock"
+  },
+  {
+    "spoken": "model as agent",
+    "replace": "Model as Agent"
+  },
+  {
+    "spoken": "model validation",
+    "replace": "Model Validation"
+  },
+  {
+    "spoken": "modifier",
+    "replace": "Modifier"
+  },
+  {
+    "spoken": "multi agent",
+    "replace": "Multi-Agent"
+  },
+  {
+    "spoken": "multi-agent",
+    "replace": "Multi-Agent"
+  },
+  {
+    "spoken": "music segment",
+    "replace": "Music Segment"
+  },
+  {
+    "spoken": "named tuple",
+    "replace": "Named Tuple"
+  },
+  {
+    "spoken": "navmesh",
+    "replace": "NavMesh"
+  },
+  {
+    "spoken": "niagara",
+    "replace": "Niagara"
+  },
+  {
+    "spoken": "o auth 2",
+    "replace": "OAuth2"
+  },
+  {
+    "spoken": "oauth 2",
+    "replace": "OAuth2"
+  },
+  {
+    "spoken": "oauth2",
+    "replace": "OAuth2"
+  },
+  {
+    "spoken": "object",
+    "replace": "Object"
+  },
+  {
+    "spoken": "observability",
+    "replace": "Observability"
+  },
+  {
+    "spoken": "ob si dian",
+    "replace": "Obsidian"
+  },
+  {
+    "spoken": "obsidian",
+    "replace": "Obsidian"
+  },
+  {
+    "spoken": "奥比西迪安",
+    "replace": "Obsidian"
+  },
+  {
+    "spoken": "黑曜石",
+    "replace": "Obsidian"
+  },
+  {
+    "spoken": "obsidian pdf",
+    "replace": "Obsidian PDF"
+  },
+  {
+    "spoken": "okr",
+    "replace": "OKR"
+  },
+  {
+    "spoken": "open AI",
+    "replace": "OpenAI"
+  },
+  {
+    "spoken": "openai",
+    "replace": "OpenAI"
+  },
+  {
+    "spoken": "open whisper",
+    "replace": "OpenWhispr"
+  },
+  {
+    "spoken": "overlap 128",
+    "replace": "Overlap 128"
+  },
+  {
+    "spoken": "p0",
+    "replace": "P0"
+  },
+  {
+    "spoken": "p1",
+    "replace": "P1"
+  },
+  {
+    "spoken": "packaging",
+    "replace": "Packaging"
+  },
+  {
+    "spoken": "paddle ocr",
+    "replace": "PaddleOCR"
+  },
+  {
+    "spoken": "parakeet",
+    "replace": "Parakeet"
+  },
+  {
+    "spoken": "patch",
+    "replace": "Patch"
+  },
+  {
+    "spoken": "pdf",
+    "replace": "PDF"
+  },
+  {
+    "spoken": "perforce",
+    "replace": "Perforce"
+  },
+  {
+    "spoken": "physics asset",
+    "replace": "Physics Asset"
+  },
+  {
+    "spoken": "pipeline",
+    "replace": "Pipeline"
+  },
+  {
+    "spoken": "player health",
+    "replace": "Player Health"
+  },
+  {
+    "spoken": "player state",
+    "replace": "Player State"
+  },
+  {
+    "spoken": "podcast-organizer-skill",
+    "replace": "Podcast-Organizer-Skill"
+  },
+  {
+    "spoken": "pointer",
+    "replace": "Pointer"
+  },
+  {
+    "spoken": "post process volume",
+    "replace": "Post Process Volume"
+  },
+  {
+    "spoken": "post event",
+    "replace": "PostEvent"
+  },
+  {
+    "spoken": "postevent",
+    "replace": "PostEvent"
+  },
+  {
+    "spoken": "ppo",
+    "replace": "PPO"
+  },
+  {
+    "spoken": "progress bar",
+    "replace": "Progress Bar"
+  },
+  {
+    "spoken": "prompt flow",
+    "replace": "Prompt Flow"
+  },
+  {
+    "spoken": "prompt injection",
+    "replace": "Prompt Injection"
+  },
+  {
+    "spoken": "property",
+    "replace": "Property"
+  },
+  {
+    "spoken": "pydantic",
+    "replace": "Pydantic"
+  },
+  {
+    "spoken": "pytest",
+    "replace": "Pytest"
+  },
+  {
+    "spoken": "python",
+    "replace": "PYTHON"
+  },
+  {
+    "spoken": "quantization",
+    "replace": "Quantization"
+  },
+  {
+    "spoken": "qwen",
+    "replace": "Qwen"
+  },
+  {
+    "spoken": "千问",
+    "replace": "Qwen"
+  },
+  {
+    "spoken": "qwen three",
+    "replace": "Qwen3"
+  },
+  {
+    "spoken": "qwen3",
+    "replace": "Qwen3"
+  },
+  {
+    "spoken": "rag",
+    "replace": "RAG"
+  },
+  {
+    "spoken": "阿RAG",
+    "replace": "RAG"
+  },
+  {
+    "spoken": "rag pipeline",
+    "replace": "RAG pipeline"
+  },
+  {
+    "spoken": "rank",
+    "replace": "Rank"
+  },
+  {
+    "spoken": "react",
+    "replace": "ReAct"
+  },
+  {
+    "spoken": "readme",
+    "replace": "README"
+  },
+  {
+    "spoken": "reaper",
+    "replace": "REAPER"
+  },
+  {
+    "spoken": "锐per",
+    "replace": "REAPER"
+  },
+  {
+    "spoken": "rebase",
+    "replace": "Rebase"
+  },
+  {
+    "spoken": "recipe snap",
+    "replace": "RecipeSnap"
+  },
+  {
+    "spoken": "recipes snap",
+    "replace": "RecipeSnap"
+  },
+  {
+    "spoken": "recipesnap",
+    "replace": "RecipeSnap"
+  },
+  {
+    "spoken": "red-green-refactor",
+    "replace": "Red-Green-Refactor"
+  },
+  {
+    "spoken": "redis",
+    "replace": "Redis"
+  },
+  {
+    "spoken": "refactoring",
+    "replace": "Refactoring"
+  },
+  {
+    "spoken": "reference",
+    "replace": "Reference"
+  },
+  {
+    "spoken": "reflection",
+    "replace": "Reflection"
+  },
+  {
+    "spoken": "repl",
+    "replace": "REPL"
+  },
+  {
+    "spoken": "reranker",
+    "replace": "Reranker"
+  },
+  {
+    "spoken": "re script",
+    "replace": "ReScript"
+  },
+  {
+    "spoken": "rescript",
+    "replace": "ReScript"
+  },
+  {
+    "spoken": "reverb zone",
+    "replace": "Reverb Zone"
+  },
+  {
+    "spoken": "rime",
+    "replace": "Rime"
+  },
+  {
+    "spoken": "rlhf",
+    "replace": "RLHF"
+  },
+  {
+    "spoken": "rpc",
+    "replace": "RPC"
+  },
+  {
+    "spoken": "rtpc",
+    "replace": "RTPC"
+  },
+  {
+    "spoken": "rye book",
+    "replace": "ryebook"
+  },
+  {
+    "spoken": "sampling",
+    "replace": "Sampling"
+  },
+  {
+    "spoken": "save game",
+    "replace": "Save Game"
+  },
+  {
+    "spoken": "scaling",
+    "replace": "Scaling"
+  },
+  {
+    "spoken": "schema",
+    "replace": "Schema"
+  },
+  {
+    "spoken": "sec01",
+    "replace": "Sec01"
+  },
+  {
+    "spoken": "sec15",
+    "replace": "Sec15"
+  },
+  {
+    "spoken": "section",
+    "replace": "Section"
+  },
+  {
+    "spoken": "semantic chunking",
+    "replace": "Semantic Chunking"
+  },
+  {
+    "spoken": "sense voice",
+    "replace": "SenseVoice"
+  },
+  {
+    "spoken": "sensevoice",
+    "replace": "SenseVoice"
+  },
+  {
+    "spoken": "sequencer",
+    "replace": "Sequencer"
+  },
+  {
+    "spoken": "shift",
+    "replace": "Shift"
+  },
+  {
+    "spoken": "side chain",
+    "replace": "Side Chain"
+  },
+  {
+    "spoken": "skeletal mesh",
+    "replace": "Skeletal Mesh"
+  },
+  {
+    "spoken": "skill",
+    "replace": "Skill"
+  },
+  {
+    "spoken": "skill loading",
+    "replace": "Skill Loading"
+  },
+  {
+    "spoken": "slot",
+    "replace": "Slot"
+  },
+  {
+    "spoken": "smart pointer",
+    "replace": "Smart Pointer"
+  },
+  {
+    "spoken": "sound bank",
+    "replace": "SoundBank"
+  },
+  {
+    "spoken": "soundbank",
+    "replace": "SoundBank"
+  },
+  {
+    "spoken": "speed",
+    "replace": "Speed"
+  },
+  {
+    "spoken": "sse",
+    "replace": "SSE"
+  },
+  {
+    "spoken": "state",
+    "replace": "State"
+  },
+  {
+    "spoken": "stinger",
+    "replace": "Stinger"
+  },
+  {
+    "spoken": "stl",
+    "replace": "STL"
+  },
+  {
+    "spoken": "streamable http",
+    "replace": "Streamable HTTP"
+  },
+  {
+    "spoken": "switch",
+    "replace": "Switch"
+  },
+  {
+    "spoken": "system prompt",
+    "replace": "System Prompt"
+  },
+  {
+    "spoken": "tabit",
+    "replace": "Tabit"
+  },
+  {
+    "spoken": "tag",
+    "replace": "Tag"
+  },
+  {
+    "spoken": "tarray",
+    "replace": "TArray"
+  },
+  {
+    "spoken": "task",
+    "replace": "Task"
+  },
+  {
+    "spoken": "task delegation",
+    "replace": "Task Delegation"
+  },
+  {
+    "spoken": "task queue",
+    "replace": "Task Queue"
+  },
+  {
+    "spoken": "temperature",
+    "replace": "Temperature"
+  },
+  {
+    "spoken": "temperature 0",
+    "replace": "Temperature 0"
+  },
+  {
+    "spoken": "terminal",
+    "replace": "Terminal"
+  },
+  {
+    "spoken": "threading",
+    "replace": "Threading"
+  },
+  {
+    "spoken": "tick",
+    "replace": "Tick"
+  },
+  {
+    "spoken": "token",
+    "replace": "Token"
+  },
+  {
+    "spoken": "托肯",
+    "replace": "Token"
+  },
+  {
+    "spoken": "tool use",
+    "replace": "Tool Use"
+  },
+  {
+    "spoken": "top-k",
+    "replace": "Top-k"
+  },
+  {
+    "spoken": "top-p",
+    "replace": "Top-p"
+  },
+  {
+    "spoken": "top-p 0",
+    "replace": "Top-p 0"
+  },
+  {
+    "spoken": "transition",
+    "replace": "Transition"
+  },
+  {
+    "spoken": "triage",
+    "replace": "Triage"
+  },
+  {
+    "spoken": "true peak",
+    "replace": "True Peak"
+  },
+  {
+    "spoken": "tsharedptr",
+    "replace": "TSharedPtr"
+  },
+  {
+    "spoken": "T T S",
+    "replace": "TTS"
+  },
+  {
+    "spoken": "tts",
+    "replace": "TTS"
+  },
+  {
+    "spoken": "type hint",
+    "replace": "Type Hint"
+  },
+  {
+    "spoken": "Tscript",
+    "replace": "TypeScript"
+  },
+  {
+    "spoken": "type script",
+    "replace": "TypeScript"
+  },
+  {
+    "spoken": "typeright",
+    "replace": "TypeScript"
+  },
+  {
+    "spoken": "typescript",
+    "replace": "TypeScript"
+  },
+  {
+    "spoken": "u class",
+    "replace": "UCLASS"
+  },
+  {
+    "spoken": "ue",
+    "replace": "UE"
+  },
+  {
+    "spoken": "U E 5",
+    "replace": "UE5"
+  },
+  {
+    "spoken": "ue five",
+    "replace": "UE5"
+  },
+  {
+    "spoken": "ue5",
+    "replace": "UE5"
+  },
+  {
+    "spoken": "you e five",
+    "replace": "UE5"
+  },
+  {
+    "spoken": "优衣5",
+    "replace": "UE5"
+  },
+  {
+    "spoken": "虚幻5",
+    "replace": "UE5"
+  },
+  {
+    "spoken": "虚幻引擎5",
+    "replace": "UE5"
+  },
+  {
+    "spoken": "u enum",
+    "replace": "UENUM"
+  },
+  {
+    "spoken": "u function",
+    "replace": "UFUNCTION"
+  },
+  {
+    "spoken": "ui",
+    "replace": "UI"
+  },
+  {
+    "spoken": "umg",
+    "replace": "UMG"
+  },
+  {
+    "spoken": "understand-anything",
+    "replace": "Understand-Anything"
+  },
+  {
+    "spoken": "unity",
+    "replace": "Unity"
+  },
+  {
+    "spoken": "unity2026",
+    "replace": "Unity2026"
+  },
+  {
+    "spoken": "unreal engine",
+    "replace": "Unreal Engine"
+  },
+  {
+    "spoken": "unregister game object",
+    "replace": "Unregister Game Object"
+  },
+  {
+    "spoken": "u object",
+    "replace": "UObject"
+  },
+  {
+    "spoken": "uobject",
+    "replace": "UObject"
+  },
+  {
+    "spoken": "u property",
+    "replace": "UPROPERTY"
+  },
+  {
+    "spoken": "u struct",
+    "replace": "USTRUCT"
+  },
+  {
+    "spoken": "vector",
+    "replace": "Vector"
+  },
+  {
+    "spoken": "vector store",
+    "replace": "Vector Store"
+  },
+  {
+    "spoken": "vertical slice",
+    "replace": "Vertical Slice"
+  },
+  {
+    "spoken": "Bibe coding",
+    "replace": "Vibe Coding"
+  },
+  {
+    "spoken": "vibe coding",
+    "replace": "Vibe Coding"
+  },
+  {
+    "spoken": "viber coding",
+    "replace": "vibe coding"
+  },
+  {
+    "spoken": "vibes coding",
+    "replace": "vibe coding"
+  },
+  {
+    "spoken": "vibing coding",
+    "replace": "vibe coding"
+  },
+  {
+    "spoken": "weeble coding",
+    "replace": "vibe coding"
+  },
+  {
+    "spoken": "wible coding",
+    "replace": "vibe coding"
+  },
+  {
+    "spoken": "拜 coding",
+    "replace": "Vibe Coding"
+  },
+  {
+    "spoken": "vibe coding python",
+    "replace": "Vibe Coding Python"
+  },
+  {
+    "spoken": "visibility",
+    "replace": "Visibility"
+  },
+  {
+    "spoken": "voice forge",
+    "replace": "VoiceForge"
+  },
+  {
+    "spoken": "voiceforge",
+    "replace": "VoiceForge"
+  },
+  {
+    "spoken": "volume",
+    "replace": "Volume"
+  },
+  {
+    "spoken": "vox CPM",
+    "replace": "VoxCPM"
+  },
+  {
+    "spoken": "W A P I",
+    "replace": "WAAPI"
+  },
+  {
+    "spoken": "waapi",
+    "replace": "WAAPI"
+  },
+  {
+    "spoken": "wappy",
+    "replace": "WAAPI"
+  },
+  {
+    "spoken": "waql",
+    "replace": "WAQL"
+  },
+  {
+    "spoken": "wav",
+    "replace": "WAV"
+  },
+  {
+    "spoken": "wbi",
+    "replace": "WBI"
+  },
+  {
+    "spoken": "web",
+    "replace": "Web"
+  },
+  {
+    "spoken": "widget",
+    "replace": "Widget"
+  },
+  {
+    "spoken": "windows terminal",
+    "replace": "Windows Terminal"
+  },
+  {
+    "spoken": "double wise",
+    "replace": "Wwise"
+  },
+  {
+    "spoken": "w why",
+    "replace": "Wwise"
+  },
+  {
+    "spoken": "wise",
+    "replace": "Wwise"
+  },
+  {
+    "spoken": "wwise",
+    "replace": "Wwise"
+  },
+  {
+    "spoken": "wwise api",
+    "replace": "Wwise API"
+  },
+  {
+    "spoken": "wwise mcp",
+    "replace": "Wwise MCP"
+  },
+  {
+    "spoken": "you tube",
+    "replace": "YouTube"
+  },
+  {
+    "spoken": "youtube",
+    "replace": "YouTube"
+  },
+  {
+    "spoken": "zhi yue book",
+    "replace": "zhiyuebook"
+  },
+  {
+    "spoken": "ni hao",
+    "replace": "你好"
+  },
+  {
+    "spoken": "file explorer",
+    "replace": "文件资源管理器"
+  },
+  {
+    "spoken": "资源管理器",
+    "replace": "文件资源管理器"
+  },
+  {
+    "spoken": "doubao",
+    "replace": "豆包"
+  }
 ]
