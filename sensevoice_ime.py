@@ -57,7 +57,7 @@ def apply_phrases(text, phrases):
 
 
 
-def play_beep(freq=880, duration=0.08, volume=0.25):
+def _play_builtin_beep(freq=880, duration=0.08, volume=0.25):
     try:
         import sounddevice as sd
         sample_rate = 16000
@@ -66,6 +66,32 @@ def play_beep(freq=880, duration=0.08, volume=0.25):
         sd.play(wave, samplerate=sample_rate, blocking=False)
     except Exception:
         pass
+
+
+def play_sound(config_value, default_freq=880, default_duration=0.08):
+    """Play a sound cue.
+
+    config_value can be:
+      - True  -> play the built-in beep
+      - False -> silent
+      - str   -> path to a WAV file to play
+    """
+    if config_value is False:
+        return
+    if isinstance(config_value, str) and config_value.strip():
+        wav_path = Path(config_value.strip())
+        if not wav_path.is_absolute():
+            wav_path = CONFIG_PATH.parent / wav_path
+        try:
+            import sounddevice as sd
+            import soundfile as sf
+            data, fs = sf.read(str(wav_path))
+            sd.play(data, samplerate=fs, blocking=False)
+        except Exception:
+            pass
+        return
+    # Default: built-in beep
+    _play_builtin_beep(freq=default_freq, duration=default_duration)
 
 
 def normalize_hotkey_for_keyboard(hotkey):
@@ -122,6 +148,161 @@ class SenseVoiceEngine:
         if not res:
             return ""
         return rich_transcription_postprocess(res[0].get("text", "")).strip()
+
+
+class TextOptimizer:
+    MODES = {
+        "0": {"name": "off", "config_key": None},
+        "1": {"name": "Qwen3-0.6B", "config_key": "qwen_0_6b_path"},
+        "2": {"name": "Qwen3-1.7B", "config_key": "qwen_1_7b_path"},
+    }
+
+    def __init__(self, config, mode="0"):
+        self.config = config
+        self.mode = str(mode or "0").strip()
+        if self.mode not in self.MODES:
+            self.mode = "0"
+        self.tokenizer = None
+        self.model = None
+        self.device = None
+
+    @property
+    def enabled(self):
+        return self.mode != "0"
+
+    @property
+    def name(self):
+        return self.MODES[self.mode]["name"]
+
+    def model_path(self):
+        config_key = self.MODES[self.mode]["config_key"]
+        raw_path = self.config.get(config_key, "") if config_key else ""
+        path = Path(raw_path).expanduser()
+        if not path.is_absolute():
+            path = CONFIG_PATH.parent / path
+        return path
+
+    def load(self):
+        if not self.enabled or self.model is not None:
+            return
+        model_path = self.model_path()
+        if not model_path.exists():
+            raise FileNotFoundError(f"Text optimizer model path does not exist: {model_path}")
+        if not (model_path / "config.json").exists():
+            raise FileNotFoundError(
+                f"Text optimizer model looks incomplete, missing config.json: {model_path}"
+            )
+
+        torch = require_import("torch")
+        transformers = require_import("transformers", "transformers")
+        AutoTokenizer = transformers.AutoTokenizer
+        AutoModelForCausalLM = transformers.AutoModelForCausalLM
+
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        dtype = "auto"
+        print(f"[optimizer] loading {self.name} from {model_path}")
+        print(f"[optimizer] device: {self.device}")
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            str(model_path),
+            local_files_only=True,
+            trust_remote_code=True,
+        )
+        self.model = AutoModelForCausalLM.from_pretrained(
+            str(model_path),
+            torch_dtype=dtype,
+            local_files_only=True,
+            trust_remote_code=True,
+        )
+        self.model.to(self.device)
+        self.model.eval()
+        print("[optimizer] ready")
+
+    def unload(self):
+        if self.model is None and self.tokenizer is None:
+            return
+        print(f"[optimizer] unloading {self.name}")
+        self.model = None
+        self.tokenizer = None
+        try:
+            import gc
+            gc.collect()
+            torch = require_import("torch")
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        except Exception:
+            pass
+
+    def build_prompt(self, text):
+        system = (
+            "你是中文语音输入法后处理器。只修正语音识别错误、错别字、"
+            "同音词、标点和断句。不要扩写，不要解释，不要改变用户语气。"
+        )
+        user = f"识别文本：{text}\n\n只输出修正后的文本。"
+        messages = [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ]
+        if hasattr(self.tokenizer, "apply_chat_template"):
+            try:
+                return self.tokenizer.apply_chat_template(
+                    messages,
+                    tokenize=False,
+                    add_generation_prompt=True,
+                    enable_thinking=False,
+                )
+            except TypeError:
+                return self.tokenizer.apply_chat_template(
+                    messages,
+                    tokenize=False,
+                    add_generation_prompt=True,
+                )
+        return f"{system}\n\n{user}\n"
+
+    def cleanup_output(self, output):
+        output = re.sub(r"<think>.*?</think>", "", output, flags=re.DOTALL | re.IGNORECASE).strip()
+        if "</think>" in output:
+            output = output.split("</think>", 1)[-1].strip()
+        return output.strip().strip('"').strip("'")
+
+    def optimize(self, text):
+        text = str(text or "").strip()
+        if not self.enabled or not text:
+            return text
+        self.load()
+        torch = require_import("torch")
+        prompt = self.build_prompt(text)
+        inputs = self.tokenizer(prompt, return_tensors="pt").to(self.device)
+        max_new_tokens = int(self.config.get("text_optimizer_max_new_tokens", 128))
+        with torch.inference_mode():
+            output_ids = self.model.generate(
+                **inputs,
+                max_new_tokens=max_new_tokens,
+                do_sample=False,
+                temperature=None,
+                top_p=None,
+                pad_token_id=self.tokenizer.eos_token_id,
+            )
+        new_tokens = output_ids[0][inputs["input_ids"].shape[-1]:]
+        optimized = self.tokenizer.decode(new_tokens, skip_special_tokens=True)
+        optimized = self.cleanup_output(optimized)
+        return optimized or text
+
+
+def choose_text_optimizer_mode(config, current_mode=None):
+    default_mode = str(current_mode or config.get("text_optimizer_default", "0")).strip()
+    if default_mode not in TextOptimizer.MODES:
+        default_mode = "0"
+    if current_mode is None and not bool(config.get("prompt_text_optimizer_on_start", True)):
+        return default_mode
+    print("Text optimizer:")
+    print("  0 = off / keep current behavior")
+    print("  1 = Qwen3-0.6B")
+    print("  2 = Qwen3-1.7B")
+    try:
+        choice = input(f"Choose text optimizer [0/1/2, default {default_mode}]: ").strip()
+    except EOFError:
+        choice = ""
+    return choice if choice in TextOptimizer.MODES else default_mode
 
 
 class Recorder:
@@ -201,6 +382,8 @@ class ImeApp:
         self.config = config
         self.phrases = load_phrases()
         self.engine = SenseVoiceEngine(config)
+        self.optimizer_lock = threading.RLock()
+        self.text_optimizer = TextOptimizer(config, choose_text_optimizer_mode(config))
         self.recorder = Recorder(config)
         self.jobs = queue.Queue()
         self.busy = False
@@ -210,7 +393,9 @@ class ImeApp:
         print(f"  Hold to record   : {self.config.get('push_to_talk_hotkey', '`')}")
         print(f"  Reload phrases   : {self.config.get('reload_phrases_hotkey', 'ctrl+alt+r')}")
         print(f"  Open phrases     : {self.config.get('open_phrases_hotkey', 'ctrl+alt+p')}")
+        print("  Rechoose model   : type qqq + Enter in this terminal")
         print("  Quit             : esc")
+        print(f"  Text optimizer   : {self.text_optimizer.name}")
         print(f"  Phrases file     : {PHRASES_PATH}")
         print("")
 
@@ -218,12 +403,15 @@ class ImeApp:
         keyboard = require_import("keyboard")
         self.print_help()
         self.engine.load()
+        self.text_optimizer.load()
         push_to_talk = self.config.get("push_to_talk_hotkey", "`")
         self.register_push_to_talk(keyboard, push_to_talk)
         keyboard.add_hotkey(self.config.get("reload_phrases_hotkey", "ctrl+alt+r"), self.reload_phrases)
         keyboard.add_hotkey(self.config.get("open_phrases_hotkey", "ctrl+alt+p"), self.open_phrases_file)
         worker = threading.Thread(target=self.worker_loop, daemon=True)
         worker.start()
+        command_listener = threading.Thread(target=self.command_loop, daemon=True)
+        command_listener.start()
         print("[ready] Put your cursor in any text box, hold the push-to-talk hotkey, speak, then release it.")
         keyboard.wait("esc")
         print("[quit]")
@@ -253,8 +441,9 @@ class ImeApp:
         if self.recorder.is_recording:
             return
         if self.recorder.start():
-            if self.config.get("sound_on_start", True):
-                play_beep(freq=880, duration=0.08)
+            start_sound = self.config.get("sound_on_start", True)
+            if start_sound is not False:
+                play_sound(start_sound, default_freq=880, default_duration=0.08)
             print("[recording] started")
             max_seconds = float(self.config.get("max_record_seconds", 60))
             threading.Timer(max_seconds, self.stop_recording_if_needed).start()
@@ -262,8 +451,9 @@ class ImeApp:
     def stop_recording_if_needed(self):
         if not self.recorder.is_recording:
             return
-        if self.config.get("sound_on_stop", True):
-            play_beep(freq=440, duration=0.12)
+        stop_sound = self.config.get("sound_on_stop", True)
+        if stop_sound is not False:
+            play_sound(stop_sound, default_freq=440, default_duration=0.12)
         wav_path, duration, rms = self.recorder.stop_to_wav()
         print(f"[recording] stopped after {duration:.1f}s, rms={rms:.4f}")
         min_seconds = float(self.config.get("min_record_seconds", 0.3))
@@ -285,6 +475,8 @@ class ImeApp:
                 print("[transcribe] working...")
                 text = self.engine.transcribe(wav_path)
                 text = apply_phrases(text, self.phrases)
+                with self.optimizer_lock:
+                    text = self.text_optimizer.optimize(text)
                 if self.config.get("append_space", False) and text:
                     text += " "
                 print(f"[text] {text}")
@@ -300,6 +492,40 @@ class ImeApp:
                     pass
                 self.busy = False
                 self.jobs.task_done()
+
+    def command_loop(self):
+        print("[command] Type qqq then Enter to rechoose the text optimizer model.")
+        while True:
+            try:
+                line = sys.stdin.readline()
+            except Exception:
+                return
+            if not line:
+                return
+            command = line.strip().lower()
+            if command == "qqq":
+                self.rechoose_text_optimizer()
+            elif command:
+                print(f"[command] unknown command: {command}")
+
+    def rechoose_text_optimizer(self):
+        current_mode = self.text_optimizer.mode
+        new_mode = choose_text_optimizer_mode(self.config, current_mode=current_mode)
+        if new_mode == current_mode:
+            print(f"[optimizer] unchanged: {self.text_optimizer.name}")
+            return
+        new_optimizer = TextOptimizer(self.config, new_mode)
+        with self.optimizer_lock:
+            self.text_optimizer.unload()
+            self.text_optimizer = new_optimizer
+            try:
+                self.text_optimizer.load()
+            except Exception as exc:
+                print(f"[optimizer] failed to switch: {exc}")
+                self.text_optimizer = TextOptimizer(self.config, "0")
+                print("[optimizer] switched to off")
+                return
+        print(f"[optimizer] switched to {self.text_optimizer.name}")
 
     def reload_phrases(self):
         self.phrases = load_phrases()
@@ -341,6 +567,7 @@ def record_once(config, seconds, paste):
         return
     text = app.engine.transcribe(wav_path)
     text = apply_phrases(text, app.phrases)
+    text = app.text_optimizer.optimize(text)
     print(f"[text] {text}")
     if paste and text:
         paste_text(text, bool(config.get("restore_clipboard", False)))

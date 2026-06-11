@@ -13,6 +13,11 @@
   "max_record_seconds": 60,
   "min_rms": 0.003,
   "push_to_talk_hotkey": "`",
-  "sound_on_start": true,
-  "sound_on_stop": true
+  "sound_on_start": "sounds/start.wav",
+  "sound_on_stop": "sounds/stop.wav",
+  "qwen_0_6b_path": "model/千问3-0.6B",
+  "qwen_1_7b_path": "model/千问3-1.7B",
+  "prompt_text_optimizer_on_start": true,
+  "text_optimizer_default": "0",
+  "text_optimizer_max_new_tokens": 128
 }

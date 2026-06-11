@@ -1,18 +1,146 @@
 [
-  {
-    "spoken": "open whisper",
-    "replace": "OpenWhispr"
-  },
-  {
-    "spoken": "sense voice",
-    "replace": "SenseVoice"
-  },
-  {
-    "spoken": "马克达",
-    "replace": "Markdown"
-  },
-  {
-    "spoken": "奥比西迪安",
-    "replace": "Obsidian"
-  }
+    {
+        "spoken":  "open whisper",
+        "replace":  "OpenWhispr"
+    },
+    {
+        "spoken":  "sense voice",
+        "replace":  "SenseVoice"
+    },
+    {
+        "spoken":  "马克达",
+        "replace":  "Markdown"
+    },
+    {
+        "spoken":  "奥比西迪安",
+        "replace":  "Obsidian"
+    },
+    {
+        "spoken":  "vibe coding",
+        "replace":  "vibe coding"
+    },
+    {
+        "spoken":  "claude",
+        "replace":  "Claude"
+    },
+    {
+        "spoken":  "codex",
+        "replace":  "Codex"
+    },
+    {
+        "spoken":  "deep seek",
+        "replace":  "DeepSeek"
+    },
+    {
+        "spoken":  "deepseek",
+        "replace":  "DeepSeek"
+    },
+    {
+        "spoken":  "kimi",
+        "replace":  "Kimi"
+    },
+    {
+        "spoken":  "github",
+        "replace":  "GitHub"
+    },
+    {
+        "spoken":  "git hub",
+        "replace":  "GitHub"
+    },
+    {
+        "spoken":  "perforce",
+        "replace":  "Perforce"
+    },
+    {
+        "spoken":  "文件资源管理器",
+        "replace":  "文件资源管理器"
+    },
+    {
+        "spoken":  "资源管理器",
+        "replace":  "文件资源管理器"
+    },
+    {
+        "spoken":  "file explorer",
+        "replace":  "文件资源管理器"
+    },
+    {
+        "spoken":  "bilibili",
+        "replace":  "Bilibili"
+    },
+    {
+        "spoken":  "b站",
+        "replace":  "Bilibili"
+    },
+    {
+        "spoken":  "youtube",
+        "replace":  "YouTube"
+    },
+    {
+        "spoken":  "you tube",
+        "replace":  "YouTube"
+    },
+    {
+        "spoken":  "gmail",
+        "replace":  "Gmail"
+    },
+    {
+        "spoken":  "g mail",
+        "replace":  "Gmail"
+    },
+    {
+        "spoken":  "repositories",
+        "replace":  "repositories"
+    },
+    {
+        "spoken":  "repository",
+        "replace":  "repository"
+    },
+    {
+        "spoken":  "repo",
+        "replace":  "repo"
+    },
+    {
+        "spoken":  "repos",
+        "replace":  "repos"
+    },
+    {
+        "spoken":  "模型",
+        "replace":  "模型"
+    },
+    {
+        "spoken":  "大模型",
+        "replace":  "大模型"
+    },
+    {
+        "spoken":  "语言模型",
+        "replace":  "语言模型"
+    },
+    {
+        "spoken":  "large language model",
+        "replace":  "large language model"
+    },
+    {
+        "spoken":  "llm",
+        "replace":  "LLM"
+    },
+    {
+        "spoken":  "wible coding",
+        "replace":  "vibe coding"
+    },
+    {
+        "spoken":  "weeble coding",
+        "replace":  "vibe coding"
+    },
+    {
+        "spoken":  "vibes coding",
+        "replace":  "vibe coding"
+    },
+    {
+        "spoken":  "vibing coding",
+        "replace":  "vibe coding"
+    },
+    {
+        "spoken":  "viber coding",
+        "replace":  "vibe coding"
+    }
 ]

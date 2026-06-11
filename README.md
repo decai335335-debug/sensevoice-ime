@@ -1,293 +1,227 @@
-# SenseVoice IME MVP
+﻿# SenseVoice IME
 
-A minimal Windows push-to-talk voice input tool that uses a local SenseVoiceSmall model to transcribe speech and paste text into the active input box.
+SenseVoice IME is a small Windows push-to-talk dictation tool. It records your voice while you hold a hotkey, transcribes it with a local SenseVoiceSmall model, optionally improves the text with a local Qwen3 model, and pastes the result into the active input box.
 
-## 1. One-Line Positioning
+Current version: `1.0.0`
 
-SenseVoice IME MVP turns your local `iic/SenseVoiceSmall` model into a lightweight voice input method: hold a hotkey, speak, release, and the recognized text is pasted where your cursor is.
+## Highlights
 
-## 2. Pain Points Solved
+- Local-first speech recognition with `model/SenseVoiceSmall`.
+- Push-to-talk recording with the backtick/grave key by default.
+- Automatic clipboard paste into the focused text box.
+- Editable phrase replacement rules in `phrases.json`.
+- Optional local text optimization after ASR:
+  - `0`: off, keep the raw SenseVoice flow.
+  - `1`: use `Qwen3-0.6B`.
+  - `2`: use `Qwen3-1.7B`.
+- Runtime model switching: type `qqq` in the terminal and press Enter to choose `0/1/2` again.
+- Start/stop sound cues, configurable in `config.json`.
+- Quiet-audio guard with an RMS threshold to reduce accidental hallucinated text.
 
-Before this tool:
+## Requirements
 
-- Voice recognition required opening a separate transcription app, copying text, and pasting it manually.
-- Local SenseVoice models were downloaded but not connected to a daily typing workflow.
-- Dictation tools often hid hotkey behavior behind a full desktop app or cloud account.
-- Custom words such as product names, project names, and tool names were easy to misrecognize.
-
-Now:
-
-- Hold one hotkey to record, release it to transcribe, and paste automatically.
-- The model runs locally from `model/SenseVoiceSmall`.
-- Phrase replacements are controlled by a simple JSON file.
-- Quiet recordings are skipped to reduce accidental false text.
-- The hotkey is **suppressed** so focused apps (e.g. VS Code, Codex, browsers) do not receive the shortcut.
-
-Who this is for:
-
-- Heavy keyboard users who want fast voice input in Obsidian, browser forms, chat boxes, and editors.
-- Local AI users who already have SenseVoiceSmall downloaded and want a practical input workflow.
-- Developers experimenting with a small, hackable dictation pipeline before building a full IME or Electron UI.
-
-## 3. Core Features
-
-| Feature | Problem It Solves |
-| --- | --- |
-| Push-to-talk recording | Avoids always-on listening and makes dictation intentional. |
-| Release-to-transcribe | Stops recording exactly when the user releases the hotkey, then starts recognition. |
-| Local SenseVoiceSmall inference | Uses the existing local model without sending audio to a cloud service. |
-| Clipboard paste output | Works with most apps by copying recognized text and sending `Ctrl+V`. |
-| Phrase replacements | Fixes recurring vocabulary such as `SenseVoice`, `OpenWhispr`, `Markdown`, and custom project terms. |
-| Quiet audio skip | Prevents low-volume background noise from becoming accidental pasted text. |
-| Hotkey suppression | Prevents apps like VS Code or Codex from intercepting the push-to-talk shortcut. |
-| Configurable hotkeys | Lets users avoid conflicts with apps that already use the grave key. |
-
-## 4. Installation
-
-### Prerequisites
-
-- Windows desktop environment.
-- Python 3.11 installed.
-- Local model folder exists:
+- Windows.
+- Python 3.11 recommended.
+- A local SenseVoiceSmall model at:
 
 ```text
 model/SenseVoiceSmall
 ```
 
-- Python dependencies installed:
-
-```bat
-python -m pip install -r requirements.txt
-```
-
-Or run the helper script:
-
-```bat
-setup.bat
-```
-
-The current tested machine already has these dependencies installed:
+- Optional local Qwen3 models at:
 
 ```text
-funasr, modelscope, torch, sounddevice, soundfile, keyboard, pyperclip, numpy
+model/千问3-0.6B
+model/千问3-1.7B
 ```
 
-### Configure Model Path
+The `model/` directory is intentionally ignored by git. Models are not uploaded to GitHub.
 
-Open `config.json` and confirm:
+## Setup
 
-```json
-"model_path": "model/SenseVoiceSmall"
+From PowerShell:
+
+```powershell
+cd "E:\Projects\ai\sensevoice_ime"
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
-### Configure Push-To-Talk Hotkey
+Or create the environment with:
 
-Default:
-
-```json
-"push_to_talk_hotkey": "`"
+```powershell
+.\setup.bat
 ```
 
-The program internally maps the backtick key to `grave`, because the Python `keyboard` package names that key `grave` on Windows.
+## Run
 
-## 5. Usage
-
-### Scenario 1: Dictate Into Any Text Box
-
-When to use: You want to enter text into Obsidian, a browser, a chat box, or another editor without typing.
-
-1. Run `run.bat`.
-2. Wait until the console prints `[model] ready` and `[ready]`.
-3. Click the target input box so the cursor is active.
-4. Hold <kbd>`</kbd> (backtick / grave key).
-5. Speak.
-6. Release <kbd>`</kbd>.
-7. Wait for `[transcribe] working...` and `[paste] sent to active input`.
-
-### Scenario 2: Add Common Words
-
-When to use: SenseVoice repeatedly writes a project name or technical term incorrectly.
-
-1. Open `phrases.json`, or press `Ctrl+Alt+P` while the program is running.
-2. Add a replacement rule:
-
-```json
-{ "spoken": "sense voice", "replace": "SenseVoice" }
+```powershell
+cd "E:\Projects\ai\sensevoice_ime"
+.\run.bat
 ```
 
-3. Save the file.
-4. Press `Ctrl+Alt+R` to reload phrases without restarting.
-
-### Scenario 3: Test The Model Without Recording
-
-When to use: You want to confirm the local model loads correctly.
-
-```bat
-python sensevoice_ime.py --test-model
-```
-
-Expected output includes:
+When the program starts, choose the text optimizer:
 
 ```text
-[model] ready
-[test] ...
+Text optimizer:
+  0 = off / keep current behavior
+  1 = Qwen3-0.6B
+  2 = Qwen3-1.7B
+Choose text optimizer [0/1/2, default 0]:
 ```
 
-### Scenario 4: Test Recording Without Pasting
+Then:
 
-When to use: You want to debug microphone input before using it in another app.
+1. Put the cursor in any text box.
+2. Hold the backtick key: `` ` ``.
+3. Speak.
+4. Release the key.
+5. Wait for transcription and paste.
 
-```bat
-python sensevoice_ime.py --once 3 --no-paste
+Press `Esc` to quit.
+
+## Runtime Commands
+
+Type this in the running terminal and press Enter:
+
+```text
+qqq
 ```
 
-## 6. Configuration Reference (`config.json`)
+The program will ask you to choose the text optimizer again. This lets you switch between off, Qwen3-0.6B, and Qwen3-1.7B without restarting the app.
 
-| Key | Default | Description |
-| --- | --- | --- |
-| `model_path` | `model/SenseVoiceSmall` | Path to the local SenseVoiceSmall model. |
-| `language` | `auto` | Recognition language. `auto` lets the model decide. |
-| `device` | `auto` | Inference device. `auto` prefers `cuda:0` if available, otherwise `cpu`. |
-| `sample_rate` | `16000` | Microphone sample rate in Hz. |
-| `channels` | `1` | Number of recording channels. |
-| `push_to_talk_hotkey` | `` ` `` | Hold this hotkey to record. |
-| `reload_phrases_hotkey` | `ctrl+alt+r` | Reload `phrases.json` without restarting. |
-| `open_phrases_hotkey` | `ctrl+alt+p` | Open `phrases.json` in the default editor. |
-| `paste_after_transcribe` | `true` | Automatically paste the result after recognition. |
-| `append_space` | `false` | Append a trailing space to the recognized text. |
-| `restore_clipboard` | `false` | Restore the previous clipboard content after pasting. |
-| `min_record_seconds` | `0.3` | Minimum recording duration; shorter recordings are discarded. |
-| `max_record_seconds` | `60` | Maximum recording duration before forced stop. |
-| `sound_on_start` | `true` | Play a short beep when recording starts. |
-| `sound_on_stop` | `true` | Play a short beep when recording stops. |
-| `min_rms` | `0.003` | RMS volume threshold; quieter audio is skipped to avoid false recognition. |
+## Configuration
 
-## 7. Tech Stack / Toolchain / Dependencies
+Edit `config.json`:
 
-| Layer | Technology |
+```json
+{
+  "model_path": "model/SenseVoiceSmall",
+  "language": "auto",
+  "device": "auto",
+  "qwen_0_6b_path": "model/千问3-0.6B",
+  "qwen_1_7b_path": "model/千问3-1.7B",
+  "prompt_text_optimizer_on_start": true,
+  "text_optimizer_default": "0",
+  "text_optimizer_max_new_tokens": 128,
+  "push_to_talk_hotkey": "`",
+  "sound_on_start": "sounds/start.wav",
+  "sound_on_stop": "sounds/stop.wav"
+}
+```
+
+Useful fields:
+
+| Key | Meaning |
 | --- | --- |
-| Language | Python 3.11 |
-| ASR model | `iic/SenseVoiceSmall` local model |
-| ASR runtime | FunASR `AutoModel` |
-| Model source | ModelScope local cache |
-| Audio capture | `sounddevice` |
-| Audio file output | `soundfile` temporary WAV files |
-| Hotkeys | Python `keyboard` package |
-| Paste bridge | `pyperclip` + synthetic `Ctrl+V` |
-| Numeric processing | `numpy` RMS calculation |
+| `model_path` | Local SenseVoiceSmall model path. |
+| `device` | `auto` uses CUDA when available, otherwise CPU. |
+| `qwen_0_6b_path` | Local Qwen3-0.6B path. |
+| `qwen_1_7b_path` | Local Qwen3-1.7B path. |
+| `prompt_text_optimizer_on_start` | Ask for `0/1/2` on startup. |
+| `text_optimizer_default` | Default optimizer mode. |
+| `text_optimizer_max_new_tokens` | Output limit for the text optimizer. |
+| `push_to_talk_hotkey` | Hold-to-record hotkey. |
+| `reload_phrases_hotkey` | Reload `phrases.json` without restarting. |
+| `open_phrases_hotkey` | Open `phrases.json`. |
+| `min_rms` | Quiet-audio threshold. |
 
-| Tool | Purpose |
-| --- | --- |
-| `run.bat` | Starts the push-to-talk dictation loop. |
-| `test_model.bat` | Runs local model verification. |
-| `setup.bat` | Creates venv and installs dependencies. |
-| `--list-devices` | Lists available microphone devices. |
-| `--once N --no-paste` | Records for N seconds and prints text without pasting. |
+## Phrase Replacements
 
-## 8. File Structure
+Edit `phrases.json` to correct repeated ASR mistakes before the optional Qwen pass:
+
+```json
+[
+  { "spoken": "cloud code", "replace": "Claude Code" },
+  { "spoken": "chat G", "replace": "ChatGPT" },
+  { "spoken": "sense voice", "replace": "SenseVoice" }
+]
+```
+
+Reload while the program is running:
+
+```text
+Ctrl+Alt+R
+```
+
+Open the file while running:
+
+```text
+Ctrl+Alt+P
+```
+
+## Qwen Model Files
+
+A complete local Qwen model folder should contain files such as:
+
+```text
+config.json
+tokenizer.json
+generation_config.json
+model.safetensors
+```
+
+or sharded weights such as:
+
+```text
+model-00001-of-00002.safetensors
+model-00002-of-00002.safetensors
+model.safetensors.index.json
+```
+
+If you choose `1` or `2` and the folder is incomplete, the app will report the missing file.
+
+## Developer Commands
+
+List audio devices:
+
+```powershell
+.\.venv\Scripts\python.exe .\sensevoice_ime.py --list-devices
+```
+
+Test the bundled SenseVoice sample:
+
+```powershell
+.\.venv\Scripts\python.exe .\sensevoice_ime.py --test-model
+```
+
+Record once without pasting:
+
+```powershell
+.\.venv\Scripts\python.exe .\sensevoice_ime.py --once 3 --no-paste
+```
+
+Syntax check:
+
+```powershell
+python -m py_compile sensevoice_ime.py
+```
+
+## Project Files
 
 ```text
 .
-├── model/                 # Local SenseVoiceSmall model
-├── sensevoice_ime.py      # Main push-to-talk voice input program
-├── config.json            # Model path, hotkeys, recording, paste, and silence settings
-├── phrases.json           # Common phrase replacement rules
-├── requirements.txt       # Python dependencies
-├── run.bat                # One-click startup script
-├── test_model.bat         # One-click model verification script
-├── setup.bat              # Optional: create venv and install dependencies
-├── README.md              # User and developer documentation (English)
-├── README_CN.md           # User and developer documentation (Chinese)
-├── DEV_LOG.md             # Iteration history and design notes (English)
-└── DEV_LOG_CN.md          # Iteration history and design notes (Chinese)
+|-- sensevoice_ime.py
+|-- config.json
+|-- phrases.json
+|-- requirements.txt
+|-- run.bat
+|-- setup.bat
+|-- test_model.bat
+|-- README.md
+|-- README_CN.md
+|-- DEV_LOG.md
+|-- DEV_LOG_CN.md
+`-- model/              # ignored by git
 ```
 
-## 9. FAQ
+## Known Limitations
 
-Q: Is text pasted immediately when I release the hotkey?
-A: Release stops recording immediately. The text appears after model inference finishes. The console should show `[recording] stopped`, then `[transcribe] working...`, then `[paste] sent to active input`.
+- This is not a native Windows IME driver.
+- It uses clipboard paste, so some apps can block or redirect paste.
+- The console window must stay open.
+- Model loading can take time, especially for Qwen3-1.7B.
+- Switching models unloads the previous optimizer and clears CUDA cache when available, but memory behavior still depends on PyTorch and the GPU driver.
 
-Q: Why does the hotkey no longer trigger other apps?
-A: Starting from v0.3.2 the hotkey is **suppressed** before reaching the focused app. This prevents app-level shortcuts from conflicting with push-to-talk. If you prefer the old behavior, change `push_to_talk_hotkey` in `config.json` to a less common combo.
+## Version 1.0.0
 
-Q: The backtick key does not trigger recording in some apps. Why?
-A: Some applications may capture the grave key at a lower keyboard-hook level. If suppression is not enough, change `push_to_talk_hotkey` in `config.json` to a combo such as `ctrl+shift+space`, then restart `run.bat`.
-
-Q: The cursor disappears or the target app loses focus.
-A: The target app may be reacting to the same hotkey. Use a less-conflicting hotkey and click the target input box again before recording.
-
-Q: The program prints `[skip] audio too quiet`.
-A: The RMS volume was below `min_rms`. Lower `min_rms` in `config.json` if your microphone is quiet, or speak closer to the microphone.
-
-Q: Random words appear from silence.
-A: Raise `min_rms` in `config.json` so quiet background noise is skipped.
-
-Q: The text is recognized but not pasted.
-A: Some apps block synthetic paste. Try clicking the input box again, run the console as administrator, or manually paste from the clipboard.
-
-Q: Which microphone is used?
-A: `sounddevice` uses the system default input device. Run `python sensevoice_ime.py --list-devices` to inspect available devices.
-
-## 10. Roadmap
-
-Current status: MVP / prototype. It is usable, but still intentionally small and script-based.
-
-Near term:
-
-- Add a small tray icon so the console window is not required.
-- Add a hotkey conflict checker that warns when a chosen shortcut is likely to be captured by common apps.
-- ~~Add optional sound cues for recording start and stop.~~ (Done in v0.3.3)
-
-Mid term:
-
-- Add a simple settings window for model path, microphone, hotkey, and phrase replacements.
-- Add better VAD so silence and short pauses are handled more naturally.
-- Add per-application hotkey profiles for apps that already use the grave key.
-
-Long term:
-
-- Evolve from an MVP script into a local voice input companion for writing, coding, notes, and chat.
-- Keep the core local-first: audio stays on the machine and users can swap ASR models.
-
-How to contribute:
-
-- Open issues for app-specific hotkey conflicts.
-- Add phrase replacement examples for technical terms.
-- Improve paste behavior for apps that block synthetic `Ctrl+V`.
-
-## 11. Changelog
-
-### 0.3.3
-
-- Added optional sound cues (beeps) for recording start (880 Hz) and stop (440 Hz).
-- Controlled by `sound_on_start` and `sound_on_stop` in `config.json`.
-
-### 0.3.2
-
-- Hotkey is now **suppressed** so focused applications do not intercept it.
-- Added `min_record_seconds` and `max_record_seconds` config options.
-- Added `restore_clipboard` and `append_space` config options.
-- Fixed default `push_to_talk_hotkey` to `` ` `` (single grave key) in `config.json`.
-
-### 0.3.1
-
-- Added hotkey conflict documentation and FAQ.
-- Improved paste reliability notes.
-
-### 0.3.0
-
-- Replaced toggle recording with push-to-talk.
-- Default hotkey is Backtick (grave key `).
-- Added lower-level press/release listening for more reliable stop-on-release behavior.
-
-### 0.2.0
-
-- Added local SenseVoiceSmall model inference.
-- Added microphone recording and temporary WAV generation.
-- Added phrase replacement rules.
-- Added quiet audio skip with `min_rms`.
-
-### 0.1.0
-
-- Created standalone Python MVP inside the OpenWhispr checkout.
-- Added `run.bat`, `test_model.bat`, `config.json`, and `requirements.txt`.
+The `1.0.0` release marks the first complete local dictation workflow with optional local LLM text optimization and runtime model switching.
