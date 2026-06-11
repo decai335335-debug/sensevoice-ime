@@ -4,3 +4,5 @@ __pycache__/
 *.pyc
 *.wav
 model/
+raw_transcripts.jsonl
+*.local.jsonl

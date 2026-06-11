@@ -1,4 +1,6 @@
 import argparse
+from collections import deque
+from datetime import datetime
 import json
 import os
 import queue
@@ -13,6 +15,7 @@ import numpy as np
 
 CONFIG_PATH = Path(__file__).with_name("config.json")
 PHRASES_PATH = Path(__file__).with_name("phrases.json")
+RAW_TRANSCRIPTS_PATH = Path(__file__).with_name("raw_transcripts.jsonl")
 
 
 class MissingDependency(RuntimeError):
@@ -54,6 +57,24 @@ def apply_phrases(text, phrases):
     for spoken, replacement in phrases:
         result = re.sub(re.escape(spoken), replacement, result, flags=re.IGNORECASE)
     return result
+
+
+
+def resolve_project_path(config_value, default_path):
+    raw_path = str(config_value or default_path).strip()
+    path = Path(raw_path).expanduser()
+    if not path.is_absolute():
+        path = CONFIG_PATH.parent / path
+    return path
+
+
+def append_raw_transcript_log(config, entry):
+    if not bool(config.get("log_raw_transcripts", True)):
+        return
+    log_path = resolve_project_path(config.get("raw_transcripts_path"), RAW_TRANSCRIPTS_PATH)
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    with log_path.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
 
 
@@ -312,21 +333,24 @@ class Recorder:
         self.config = config
         self.sample_rate = int(config.get("sample_rate", 16000))
         self.channels = int(config.get("channels", 1))
+        self.pre_roll_seconds = float(config.get("pre_roll_seconds", 0.5))
+        self.pre_roll_samples = max(0, int(self.sample_rate * self.pre_roll_seconds))
+        self.pre_frames = deque()
+        self.pre_frame_samples = 0
         self.frames = []
         self.stream = None
+        self.recording = False
         self.started_at = None
         self.lock = threading.Lock()
 
     @property
     def is_recording(self):
-        return self.stream is not None
+        return self.recording
 
-    def start(self):
+    def ensure_stream(self):
         with self.lock:
             if self.stream is not None:
-                return False
-            self.frames = []
-            self.started_at = time.time()
+                return
             self.stream = self.sd.InputStream(
                 samplerate=self.sample_rate,
                 channels=self.channels,
@@ -334,25 +358,46 @@ class Recorder:
                 callback=self._callback,
             )
             self.stream.start()
+            print(f"[audio] stream ready, pre-roll={self.pre_roll_seconds:.2f}s")
+
+    def start(self):
+        self.ensure_stream()
+        with self.lock:
+            if self.recording:
+                return False
+            self.frames = [frame.copy() for frame in self.pre_frames]
+            self.started_at = time.time()
+            self.recording = True
             return True
+
+    def _trim_pre_roll_locked(self):
+        while self.pre_frame_samples > self.pre_roll_samples and self.pre_frames:
+            old = self.pre_frames.popleft()
+            self.pre_frame_samples -= old.shape[0]
 
     def _callback(self, indata, frames, time_info, status):
         if status:
             print(f"[audio] {status}")
-        self.frames.append(indata.copy())
+        chunk = indata.copy()
+        with self.lock:
+            if self.pre_roll_samples > 0:
+                self.pre_frames.append(chunk)
+                self.pre_frame_samples += chunk.shape[0]
+                self._trim_pre_roll_locked()
+            if self.recording:
+                self.frames.append(chunk)
 
     def stop_to_wav(self):
         with self.lock:
-            if self.stream is None:
-                return None, 0.0
-            stream = self.stream
-            self.stream = None
-        stream.stop()
-        stream.close()
-        duration = time.time() - (self.started_at or time.time())
-        if not self.frames:
+            if not self.recording:
+                return None, 0.0, 0.0
+            self.recording = False
+            duration = time.time() - (self.started_at or time.time())
+            frames = [frame.copy() for frame in self.frames]
+            self.frames = []
+        if not frames:
             return None, duration, 0.0
-        audio = np.concatenate(self.frames, axis=0)
+        audio = np.concatenate(frames, axis=0)
         rms = float(np.sqrt(np.mean(np.square(audio)))) if audio.size else 0.0
         fd, name = tempfile.mkstemp(prefix="sensevoice_ime_", suffix=".wav")
         os.close(fd)
@@ -397,6 +442,7 @@ class ImeApp:
         print("  Quit             : esc")
         print(f"  Text optimizer   : {self.text_optimizer.name}")
         print(f"  Phrases file     : {PHRASES_PATH}")
+        print(f"  Raw ASR log      : {resolve_project_path(self.config.get('raw_transcripts_path'), RAW_TRANSCRIPTS_PATH)}")
         print("")
 
     def start(self):
@@ -404,6 +450,7 @@ class ImeApp:
         self.print_help()
         self.engine.load()
         self.text_optimizer.load()
+        self.recorder.ensure_stream()
         push_to_talk = self.config.get("push_to_talk_hotkey", "`")
         self.register_push_to_talk(keyboard, push_to_talk)
         keyboard.add_hotkey(self.config.get("reload_phrases_hotkey", "ctrl+alt+r"), self.reload_phrases)
@@ -473,10 +520,22 @@ class ImeApp:
             self.busy = True
             try:
                 print("[transcribe] working...")
-                text = self.engine.transcribe(wav_path)
-                text = apply_phrases(text, self.phrases)
+                asr_text = self.engine.transcribe(wav_path)
+                asr_after_phrases = apply_phrases(asr_text, self.phrases)
                 with self.optimizer_lock:
-                    text = self.text_optimizer.optimize(text)
+                    optimizer_mode = self.text_optimizer.mode
+                    optimizer_name = self.text_optimizer.name
+                    text = self.text_optimizer.optimize(asr_after_phrases)
+                append_raw_transcript_log(self.config, {
+                    "timestamp": datetime.now().isoformat(timespec="seconds"),
+                    "duration_seconds": round(float(duration), 3),
+                    "rms": round(float(rms), 6),
+                    "optimizer_mode": optimizer_mode,
+                    "optimizer_name": optimizer_name,
+                    "asr_raw": asr_text,
+                    "asr_after_phrases": asr_after_phrases,
+                    "final_text": text,
+                })
                 if self.config.get("append_space", False) and text:
                     text += " "
                 print(f"[text] {text}")
@@ -555,6 +614,7 @@ def test_model(config):
 def record_once(config, seconds, paste):
     app = ImeApp(config)
     app.engine.load()
+    app.recorder.ensure_stream()
     print(f"[recording] fixed {seconds}s")
     app.recorder.start()
     time.sleep(seconds)
@@ -565,9 +625,22 @@ def record_once(config, seconds, paste):
         print(f"[skip] audio too quiet, rms {rms:.4f} < {min_rms:.4f}")
         Path(wav_path).unlink(missing_ok=True)
         return
-    text = app.engine.transcribe(wav_path)
-    text = apply_phrases(text, app.phrases)
-    text = app.text_optimizer.optimize(text)
+    asr_text = app.engine.transcribe(wav_path)
+    asr_after_phrases = apply_phrases(asr_text, app.phrases)
+    with app.optimizer_lock:
+        optimizer_mode = app.text_optimizer.mode
+        optimizer_name = app.text_optimizer.name
+        text = app.text_optimizer.optimize(asr_after_phrases)
+    append_raw_transcript_log(config, {
+        "timestamp": datetime.now().isoformat(timespec="seconds"),
+        "duration_seconds": round(float(duration), 3),
+        "rms": round(float(rms), 6),
+        "optimizer_mode": optimizer_mode,
+        "optimizer_name": optimizer_name,
+        "asr_raw": asr_text,
+        "asr_after_phrases": asr_after_phrases,
+        "final_text": text,
+    })
     print(f"[text] {text}")
     if paste and text:
         paste_text(text, bool(config.get("restore_clipboard", False)))
