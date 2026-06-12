@@ -1,4 +1,4 @@
-﻿import argparse
+import argparse
 from collections import deque
 from datetime import datetime
 import json
@@ -12,6 +12,9 @@ import time
 from pathlib import Path
 
 import numpy as np
+
+from tools.audio_processor import InputGuard, OutputPolish, choose_audio_processing_mode, audio_rms
+from tools.noise_suppressor import NoiseSuppressor, choose_noise_suppression_mode
 
 CONFIG_PATH = Path(__file__).with_name("config.json")
 PHRASES_PATH = Path(__file__).with_name("phrases.json")
@@ -142,20 +145,68 @@ def normalize_hotkey_for_keyboard(hotkey):
     return str(hotkey).replace("`", "grave")
 
 
+def torch_cuda_available():
+    try:
+        import torch
+        return bool(torch.cuda.is_available())
+    except Exception:
+        return False
+
+
 def choose_device(config):
     device = str(config.get("device", "auto")).strip().lower()
     if device and device != "auto":
+        if device.startswith("cuda") and not torch_cuda_available():
+            print("[device] GPU selected, but current PyTorch cannot see CUDA; falling back to CPU.")
+            return "cpu"
         return device
-    try:
-        import torch
-        if torch.cuda.is_available():
-            return "cuda:0"
-    except Exception:
-        pass
+    if torch_cuda_available():
+        return "cuda:0"
     return "cpu"
 
 
+def choose_asr_device_mode(config):
+    modes = {"0": "cpu", "1": "gpu"}
+    default_mode = str(config.get("asr_device_default", "1")).strip()
+    if default_mode not in modes:
+        default_mode = "1"
+    if bool(config.get("prompt_asr_device_on_start", True)):
+        print("ASR device:")
+        print("  0 = CPU / compatible but slower")
+        print("  1 = GPU / CUDA, fastest if CUDA PyTorch is installed")
+        try:
+            choice = input(f"Choose ASR device [0/1, default {default_mode}]: ").strip()
+        except EOFError:
+            choice = ""
+        mode = choice if choice in modes else default_mode
+    else:
+        mode = default_mode
+    config["asr_device_mode"] = mode
+    config["device"] = "cuda:0" if mode == "1" else "cpu"
+    return choose_device(config)
+
+
+def choose_asr_engine_mode(config):
+    modes = {"0": "SenseVoiceSmall", "1": "Qwen3-ASR-0.6B", "2": "Qwen3-ASR-1.7B"}
+    default_mode = str(config.get("asr_engine_default", "0")).strip()
+    if default_mode not in modes:
+        default_mode = "0"
+    if not bool(config.get("prompt_asr_engine_on_start", True)):
+        return default_mode
+    print("ASR engine:")
+    print("  0 = SenseVoiceSmall / current default")
+    print("  1 = Qwen3-ASR-0.6B")
+    print("  2 = Qwen3-ASR-1.7B")
+    try:
+        choice = input(f"Choose ASR engine [0/1/2, default {default_mode}]: ").strip()
+    except EOFError:
+        choice = ""
+    return choice if choice in modes else default_mode
+
+
 class SenseVoiceEngine:
+    name = "SenseVoiceSmall"
+
     def __init__(self, config):
         self.config = config
         self.model = None
@@ -192,6 +243,76 @@ class SenseVoiceEngine:
             return ""
         return rich_transcription_postprocess(res[0].get("text", "")).strip()
 
+
+class QwenAsrEngine:
+    MODES = {
+        "1": {"name": "Qwen3-ASR-0.6B", "config_key": "qwen_asr_0_6b_path"},
+        "2": {"name": "Qwen3-ASR-1.7B", "config_key": "qwen_asr_1_7b_path"},
+    }
+
+    def __init__(self, config, mode):
+        self.config = config
+        self.mode = str(mode)
+        self.info = self.MODES[self.mode]
+        self.model = None
+        self.device = choose_device(config)
+
+    @property
+    def name(self):
+        return self.info["name"]
+
+    def model_path(self):
+        raw_path = str(self.config.get(self.info["config_key"], "")).strip()
+        path = Path(raw_path).expanduser()
+        if not path.is_absolute():
+            path = CONFIG_PATH.parent / path
+        return path
+
+    def load(self):
+        if self.model is not None:
+            return
+        model_path = self.model_path()
+        if not model_path.exists():
+            raise FileNotFoundError(f"Qwen ASR model path does not exist: {model_path}")
+        if not (model_path / "config.json").exists():
+            raise FileNotFoundError(f"Qwen ASR model looks incomplete, missing config.json: {model_path}")
+        torch = require_import("torch")
+        from qwen_asr import Qwen3ASRModel
+        dtype = torch.bfloat16 if str(self.device).startswith("cuda") else torch.float32
+        device_map = self.device if str(self.device).startswith("cuda") else "cpu"
+        print(f"[model] loading {self.name} from {model_path}")
+        print(f"[model] device: {device_map}")
+        self.model = Qwen3ASRModel.from_pretrained(
+            str(model_path),
+            dtype=dtype,
+            device_map=device_map,
+            max_inference_batch_size=int(self.config.get("qwen_asr_max_inference_batch_size", 1)),
+            max_new_tokens=int(self.config.get("qwen_asr_max_new_tokens", 256)),
+        )
+        print("[model] ready")
+
+    def qwen_language(self):
+        language = str(self.config.get("qwen_asr_language", "auto")).strip()
+        if not language or language.lower() == "auto":
+            return None
+        return language
+
+    def transcribe(self, wav_path):
+        self.load()
+        results = self.model.transcribe(audio=str(wav_path), language=self.qwen_language())
+        if not results:
+            return ""
+        result = results[0]
+        return str(getattr(result, "text", result)).strip()
+
+
+def create_asr_engine(config):
+    config["asr_runtime_device"] = choose_asr_device_mode(config)
+    mode = choose_asr_engine_mode(config)
+    config["asr_engine_mode"] = mode
+    if mode == "0":
+        return SenseVoiceEngine(config)
+    return QwenAsrEngine(config, mode)
 
 class TextOptimizer:
     MODES = {
@@ -357,9 +478,12 @@ class Recorder:
         self.channels = int(config.get("channels", 1))
         self.pre_roll_seconds = float(config.get("pre_roll_seconds", 0.5))
         self.pre_roll_samples = max(0, int(self.sample_rate * self.pre_roll_seconds))
+        self.input_guard = InputGuard(config)
         self.pre_frames = deque()
+        self.pre_raw_frames = deque()
         self.pre_frame_samples = 0
         self.frames = []
+        self.raw_frames = []
         self.stream = None
         self.recording = False
         self.started_at = None
@@ -380,14 +504,17 @@ class Recorder:
                 callback=self._callback,
             )
             self.stream.start()
-            print(f"[audio] stream ready, pre-roll={self.pre_roll_seconds:.2f}s")
+            mode = "on" if self.input_guard.enabled else "off"
+            print(f"[audio] stream ready, pre-roll={self.pre_roll_seconds:.2f}s, input_guard={mode}")
 
     def start(self):
         self.ensure_stream()
         with self.lock:
             if self.recording:
                 return False
+            self.input_guard.reset()
             self.frames = [frame.copy() for frame in self.pre_frames]
+            self.raw_frames = [frame.copy() for frame in self.pre_raw_frames]
             self.started_at = time.time()
             self.recording = True
             return True
@@ -395,37 +522,59 @@ class Recorder:
     def _trim_pre_roll_locked(self):
         while self.pre_frame_samples > self.pre_roll_samples and self.pre_frames:
             old = self.pre_frames.popleft()
+            self.pre_raw_frames.popleft()
             self.pre_frame_samples -= old.shape[0]
 
     def _callback(self, indata, frames, time_info, status):
         if status:
             print(f"[audio] {status}")
-        chunk = indata.copy()
+        raw_chunk = indata.copy()
+        processed_chunk = self.input_guard.process_chunk(raw_chunk)
         with self.lock:
             if self.pre_roll_samples > 0:
-                self.pre_frames.append(chunk)
-                self.pre_frame_samples += chunk.shape[0]
+                self.pre_frames.append(processed_chunk.copy())
+                self.pre_raw_frames.append(raw_chunk.copy())
+                self.pre_frame_samples += processed_chunk.shape[0]
                 self._trim_pre_roll_locked()
             if self.recording:
-                self.frames.append(chunk)
+                self.frames.append(processed_chunk.copy())
+                self.raw_frames.append(raw_chunk.copy())
 
     def stop_to_wav(self):
         with self.lock:
             if not self.recording:
-                return None, 0.0, 0.0
+                empty_stats = {"enabled": self.input_guard.enabled, "mode": "input_guard_only" if self.input_guard.enabled else "off", "raw_rms": 0.0, "raw_peak": 0.0, "guarded_rms": 0.0, "guarded_peak": 0.0, "processed_rms": 0.0, "processed_peak": 0.0}
+                return None, 0.0, 0.0, 0.0, empty_stats
             self.recording = False
             duration = time.time() - (self.started_at or time.time())
             frames = [frame.copy() for frame in self.frames]
+            raw_frames = [frame.copy() for frame in self.raw_frames]
             self.frames = []
+            self.raw_frames = []
         if not frames:
-            return None, duration, 0.0
+            empty_stats = {"enabled": self.input_guard.enabled, "mode": "input_guard_only" if self.input_guard.enabled else "off", "raw_rms": 0.0, "raw_peak": 0.0, "guarded_rms": 0.0, "guarded_peak": 0.0, "processed_rms": 0.0, "processed_peak": 0.0}
+            return None, duration, 0.0, 0.0, empty_stats
         audio = np.concatenate(frames, axis=0)
-        rms = float(np.sqrt(np.mean(np.square(audio)))) if audio.size else 0.0
+        raw_audio = np.concatenate(raw_frames, axis=0) if raw_frames else audio
+        raw_rms = audio_rms(raw_audio)
+        guarded_rms = audio_rms(audio)
+        raw_peak = float(np.max(np.abs(raw_audio))) if raw_audio.size else 0.0
+        guarded_peak = float(np.max(np.abs(audio))) if audio.size else 0.0
+        audio_stats = {
+            "enabled": bool(self.input_guard.enabled),
+            "mode": "input_guard_only" if self.input_guard.enabled else "off",
+            "raw_rms": raw_rms,
+            "raw_peak": raw_peak,
+            "guarded_rms": guarded_rms,
+            "guarded_peak": guarded_peak,
+            "processed_rms": guarded_rms,
+            "processed_peak": guarded_peak,
+            "input_limiter_peak_dbfs": float(self.config.get("audio_input_limiter_peak_dbfs", -1.0)),
+        }
         fd, name = tempfile.mkstemp(prefix="sensevoice_ime_", suffix=".wav")
         os.close(fd)
         self.sf.write(name, audio, self.sample_rate)
-        return Path(name), duration, rms
-
+        return Path(name), duration, raw_rms, guarded_rms, audio_stats
 
 def paste_text(text, restore_clipboard=False):
     pyperclip = require_import("pyperclip")
@@ -448,9 +597,11 @@ class ImeApp:
     def __init__(self, config):
         self.config = config
         self.phrases = load_phrases()
-        self.engine = SenseVoiceEngine(config)
+        self.engine = create_asr_engine(config)
         self.optimizer_lock = threading.RLock()
         self.text_optimizer = TextOptimizer(config, choose_text_optimizer_mode(config))
+        self.noise_suppressor = NoiseSuppressor(config, CONFIG_PATH.parent)
+        self.output_polish = OutputPolish(config)
         self.recorder = Recorder(config)
         self.jobs = queue.Queue()
         self.busy = False
@@ -463,7 +614,12 @@ class ImeApp:
         print(f"  Open phrases     : {self.config.get('open_phrases_hotkey', 'ctrl+alt+p')}")
         print("  Rechoose model   : type qqq + Enter in this terminal")
         print("  Quit             : esc")
+        print(f"  ASR engine       : {self.engine.name}")
+        print(f"  ASR device       : {getattr(self.engine, 'device', self.config.get('device', 'auto'))}")
         print(f"  Text optimizer   : {self.text_optimizer.name}")
+        print(f"  Input guard      : {'on' if self.recorder.input_guard.enabled else 'off'}")
+        print(f"  Noise suppressor : {'FRCRN (lazy load)' if self.noise_suppressor.enabled else 'off'}")
+        print(f"  Output polish    : {'on' if self.output_polish.enabled else 'off'}")
         print(f"  Phrases file     : {PHRASES_PATH}")
         print(f"  Raw ASR log      : {resolve_project_path(self.config.get('raw_transcripts_path'), RAW_TRANSCRIPTS_PATH)}")
         print("")
@@ -536,8 +692,8 @@ class ImeApp:
         stop_sound = self.config.get("sound_on_stop", True)
         if stop_sound is not False:
             play_sound(stop_sound, default_freq=440, default_duration=0.12)
-        wav_path, duration, rms = self.recorder.stop_to_wav()
-        print(f"[recording] stopped after {duration:.1f}s, rms={rms:.4f}")
+        wav_path, duration, rms, processed_rms, audio_stats = self.recorder.stop_to_wav()
+        print(f"[recording] stopped after {duration:.1f}s, rms={rms:.4f}, processed_rms={processed_rms:.4f}")
         min_seconds = float(self.config.get("min_record_seconds", 0.3))
         if not wav_path or duration < min_seconds:
             print("[skip] recording too short")
@@ -547,15 +703,56 @@ class ImeApp:
             print(f"[skip] audio too quiet, rms {rms:.4f} < {min_rms:.4f}")
             Path(wav_path).unlink(missing_ok=True)
             return
-        self.jobs.put((wav_path, duration, rms))
+        self.jobs.put((wav_path, duration, rms, processed_rms, audio_stats))
 
+    def prepare_audio_for_asr(self, wav_path, audio_stats):
+        cleanup_paths = []
+        current_path = Path(wav_path)
+        denoise_stats = {"enabled": False, "model": "off"}
+        try:
+            current_path, denoise_stats, denoise_created = self.noise_suppressor.enhance(current_path)
+            if denoise_created:
+                cleanup_paths.append(current_path)
+        except Exception as exc:
+            denoise_stats = {"enabled": bool(self.noise_suppressor.enabled), "model": "FRCRN", "error": str(exc)}
+            print(f"[denoise] failed, using guarded audio: {exc}")
+            current_path = Path(wav_path)
+
+        data, sample_rate = self.recorder.sf.read(str(current_path), dtype="float32", always_2d=True)
+        final_audio = self.output_polish.process_audio(data)
+        final_rms = audio_rms(final_audio)
+        final_peak = float(np.max(np.abs(final_audio))) if final_audio.size else 0.0
+        audio_stats.update({
+            "denoise": denoise_stats,
+            "output_polish_enabled": bool(self.output_polish.enabled),
+            "output_gain_db": float(audio_stats.get("output_gain_db", 0.0)),
+            "processed_rms": final_rms,
+            "processed_peak": final_peak,
+        })
+        if self.output_polish.enabled:
+            audio_stats["output_gain_db"] = float(audio_stats.get("output_gain_db", 0.0))
+            try:
+                from tools.audio_processor import linear_to_db
+                audio_stats["output_gain_db"] = linear_to_db(self.output_polish.current_gain)
+            except Exception:
+                pass
+            fd, name = tempfile.mkstemp(prefix="sensevoice_ime_polished_", suffix=".wav")
+            os.close(fd)
+            self.recorder.sf.write(name, final_audio, sample_rate)
+            final_path = Path(name)
+            cleanup_paths.append(final_path)
+            return final_path, audio_stats, cleanup_paths
+        return current_path, audio_stats, cleanup_paths
     def worker_loop(self):
         while True:
-            wav_path, duration, rms = self.jobs.get()
+            wav_path, duration, rms, processed_rms, audio_stats = self.jobs.get()
+            cleanup_paths = []
             self.busy = True
             try:
                 print("[transcribe] working...")
-                asr_text = self.engine.transcribe(wav_path)
+                asr_wav_path, audio_stats, cleanup_paths = self.prepare_audio_for_asr(wav_path, audio_stats)
+                processed_rms = float(audio_stats.get("processed_rms", processed_rms))
+                asr_text = self.engine.transcribe(asr_wav_path)
                 asr_for_phrases = sanitize_output_language(asr_text, self.config)
                 asr_after_phrases = apply_phrases(asr_for_phrases, self.phrases)
                 with self.optimizer_lock:
@@ -567,6 +764,9 @@ class ImeApp:
                     "timestamp": datetime.now().isoformat(timespec="seconds"),
                     "duration_seconds": round(float(duration), 3),
                     "rms": round(float(rms), 6),
+                    "processed_rms": round(float(processed_rms), 6),
+                    "audio_processing": audio_stats,
+                    "asr_engine": self.engine.name,
                     "optimizer_mode": optimizer_mode,
                     "optimizer_name": optimizer_name,
                     "asr_raw": asr_text,
@@ -585,6 +785,8 @@ class ImeApp:
             finally:
                 try:
                     Path(wav_path).unlink(missing_ok=True)
+                    for extra_path in cleanup_paths:
+                        Path(extra_path).unlink(missing_ok=True)
                 except Exception:
                     pass
                 self.busy = False
@@ -656,14 +858,16 @@ def record_once(config, seconds, paste):
     print(f"[recording] fixed {seconds}s")
     app.recorder.start()
     time.sleep(seconds)
-    wav_path, duration, rms = app.recorder.stop_to_wav()
-    print(f"[recording] stopped after {duration:.1f}s, rms={rms:.4f}")
+    wav_path, duration, rms, processed_rms, audio_stats = app.recorder.stop_to_wav()
+    print(f"[recording] stopped after {duration:.1f}s, rms={rms:.4f}, processed_rms={processed_rms:.4f}")
     min_rms = float(config.get("min_rms", 0.0))
     if rms < min_rms:
         print(f"[skip] audio too quiet, rms {rms:.4f} < {min_rms:.4f}")
         Path(wav_path).unlink(missing_ok=True)
         return
-    asr_text = app.engine.transcribe(wav_path)
+    asr_wav_path, audio_stats, cleanup_paths = app.prepare_audio_for_asr(wav_path, audio_stats)
+    processed_rms = float(audio_stats.get("processed_rms", processed_rms))
+    asr_text = app.engine.transcribe(asr_wav_path)
     asr_for_phrases = sanitize_output_language(asr_text, config)
     asr_after_phrases = apply_phrases(asr_for_phrases, app.phrases)
     with app.optimizer_lock:
@@ -675,6 +879,9 @@ def record_once(config, seconds, paste):
         "timestamp": datetime.now().isoformat(timespec="seconds"),
         "duration_seconds": round(float(duration), 3),
         "rms": round(float(rms), 6),
+        "processed_rms": round(float(processed_rms), 6),
+        "audio_processing": audio_stats,
+        "asr_engine": app.engine.name,
         "optimizer_mode": optimizer_mode,
         "optimizer_name": optimizer_name,
         "asr_raw": asr_text,
@@ -687,6 +894,8 @@ def record_once(config, seconds, paste):
         paste_text(text, bool(config.get("restore_clipboard", False)))
         print("[paste] sent to active input")
     Path(wav_path).unlink(missing_ok=True)
+    for extra_path in cleanup_paths:
+        Path(extra_path).unlink(missing_ok=True)
 
 
 def main():
@@ -708,8 +917,12 @@ def main():
         elif args.test_model:
             test_model(config)
         elif args.once > 0:
+            config["audio_processing_enabled"] = choose_audio_processing_mode(config)
+            config["noise_suppression_enabled"] = choose_noise_suppression_mode(config)
             record_once(config, args.once, not args.no_paste)
         else:
+            config["audio_processing_enabled"] = choose_audio_processing_mode(config)
+            config["noise_suppression_enabled"] = choose_noise_suppression_mode(config)
             ImeApp(config).start()
     except MissingDependency as exc:
         print(f"[dependency] {exc}")
@@ -722,4 +935,3 @@ def main():
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

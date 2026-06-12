@@ -1,263 +1,318 @@
-# SenseVoice IME
+﻿# SenseVoice IME
 
-SenseVoice IME is a small Windows push-to-talk dictation tool. It records your voice while you hold a hotkey, transcribes it with a local SenseVoiceSmall model, optionally improves the text with a local Qwen3 model, and pastes the result into the active input box.
+SenseVoice IME 是一个 Windows 本地按住说话输入工具：按住热键录音，用本地 ASR 模型识别语音，可选本地 Qwen 文本优化，然后把结果自动粘贴到当前输入框。
 
-Current version: `1.1.0`
+当前版本：`1.4.0`
 
-## Highlights
+## 1. 一句话定位
 
-- Local-first speech recognition with `model/SenseVoiceSmall`.
-- Push-to-talk recording with the backtick/grave key by default.
-- Automatic clipboard paste into the focused text box.
-- Editable phrase replacement rules in `phrases.json`; this shared hotword library is tracked and uploaded with the repository.
-- Optional local text optimization after ASR:
-  - `0`: off, keep the raw SenseVoice flow.
-  - `1`: use `Qwen3-0.6B`.
-  - `2`: use `Qwen3-1.7B`.
-- Runtime model switching: type `qqq` in the terminal and press Enter to choose `0/1/2` again.
-- Start/stop sound cues, configurable in `config.json`.
-- Quiet-audio guard with an RMS threshold to reduce accidental hallucinated text.
-- Raw ASR logging to `raw_transcripts.jsonl` before Qwen optimization for review and fine-tuning samples.
-- Chinese/English output restriction to filter accidental Korean/Japanese script hallucinations from auto language detection.
-- Pre-roll audio buffering and hotkey release debounce to reduce clipped starts and random stop events.
+这是一个面向中文/英文混合输入的本地语音输入法 MVP，用按住说话替代键盘输入，并通过热词库、本地 ASR、本地文本优化和 GPU 加速提升技术词、项目名、英文缩写的识别稳定性。
 
-## Requirements
+## 2. 解决什么痛点
 
-- Windows.
-- Python 3.11 recommended.
-- A local SenseVoiceSmall model at:
+以前是这样的：
+
+- 说中文夹英文技术词时，`GitHub`、`Claude`、`vibe coding`、项目名经常被识别错。
+- 长按录音偶尔会漏掉开头，或者误触松开导致一句话被截断。
+- 识别错了以后没有原始记录，后面很难复盘到底是 ASR 错、热词错，还是文本优化错。
+- 大模型 ASR 和降噪模型如果跑在 CPU 上会明显卡顿，启动和识别都慢。
+- 麦克风声音忽大忽小、偶尔爆音，会影响输入体验。
+
+现在是这样的：
+
+- 启动时可选择 SenseVoiceSmall、Qwen3-ASR-0.6B、Qwen3-ASR-1.7B，不同速度和效果可以现场切换。
+- 启动时可选择 ASR 运行设备：`0 = CPU`、`1 = GPU/CUDA`，程序会明确显示当前实际设备。
+- Qwen3-ASR 可在 CUDA PyTorch 环境下使用 RTX GPU 加速，避免 1.7B 模型全部压在 CPU 上。
+- 原始 ASR 文本会记录到 `raw_transcripts.jsonl`，即使打开文本优化，也能回看“模型优化前到底识别了什么”。
+- `phrases.json` 作为热词/纠错库纳入仓库，常见术语可以持续积累。
+- 音频链路拆成输入保护、可选降噪、输出整理三段，避免为了听感处理牺牲 ASR 速度。
+
+适合谁用：
+
+- 中文/英文混合工作的开发者：经常口述 `GitHub`、`ChatGPT`、`Python`、`Claude`、项目名和命令。
+- 想本地优先处理语音输入的人：ASR、热词、文本优化都可以在本机运行。
+- 想持续改进个人识别效果的人：通过原始日志和热词库定期复盘错误样本。
+
+## 3. 核心功能
+
+| 功能 | 解决什么问题 |
+| --- | --- |
+| 按住说话输入 | 不用切换窗口或点击按钮，按住反引号键说话，松开后自动识别并粘贴。 |
+| ASR 模型选择 | 默认 SenseVoiceSmall 保持轻量，也可以切到 Qwen3-ASR-0.6B / 1.7B 追求更好的中文方言和混合语言识别。 |
+| ASR CPU/GPU 切换 | 启动时明确选择 CPU 或 GPU，避免不知道模型到底跑在哪里；CUDA 不可用时自动回退 CPU 并提示。 |
+| 本地 Qwen 文本优化 | 识别后可选 Qwen3-0.6B / 1.7B 修正同音字、技术词、标点和断句。 |
+| 热词库 `phrases.json` | 把高频错词、项目名、英文术语做成确定性替换规则，减少重复修正。 |
+| 原始 ASR 日志 | 保存优化前文本，方便后续制作微调样本、更新热词库、判断模型真实错误。 |
+| 输入保护 InputGuard | 录音回调里只做 DC offset 去除和 limiter，防止后续数字处理造成更严重削波。 |
+| 可选 FRCRN 降噪 | 嘈杂环境可打开单麦 16k 降噪；默认关闭，并采用 lazy load，避免启动变慢。 |
+| OutputPolish | 降噪后再做 AGC / compressor / final limiter，减少把底噪提前放大的风险。 |
+| 运行中重选文本优化 | 在终端输入 `qqq` 回车，可以重新选择文本优化模型。 |
+
+## 4. 安装方法
+
+### 第一步：进入项目目录
+
+PowerShell 里使用：
+
+```powershell
+cd "E:\Projects\ai\sensevoice_ime"
+```
+
+注意：PowerShell 不支持 `cd /d E:\...` 这种 CMD 写法。
+
+### 第二步：安装基础依赖
+
+如果已经有 `.venv`：
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+```
+
+如果是第一次创建环境：
+
+```powershell
+.\setup.bat
+```
+
+### 第三步：安装 CUDA 版 PyTorch（需要 GPU 加速时）
+
+如果你要让 Qwen3-ASR 跑在 NVIDIA GPU 上，确认终端里显示的是 CUDA 版 PyTorch：
+
+```powershell
+.\.venv\Scripts\python.exe -c "import torch; print(torch.__version__); print(torch.cuda.is_available()); print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'none')"
+```
+
+期望看到类似：
+
+```text
+torch 2.11.0+cu128
+cuda_available True
+NVIDIA GeForce RTX 3080 Ti
+```
+
+如果显示 `+cpu` 或 `False`，安装 CUDA 版：
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install --upgrade --force-reinstall torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
+```
+
+### 第四步：准备本地模型
+
+必须模型：
 
 ```text
 model/SenseVoiceSmall
 ```
 
-- Optional local Qwen3 models at:
+可选文本优化模型：
 
 ```text
 model/千问3-0.6B
 model/千问3-1.7B
 ```
 
-The `model/` directory is intentionally ignored by git. Models are not uploaded to GitHub.
+可选 Qwen ASR 模型，默认使用 ModelScope 缓存路径：
 
-## Setup
-
-From PowerShell:
-
-```powershell
-cd "E:\Projects\ai\sensevoice_ime"
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+```text
+C:\Users\15403\.cache\modelscope\hub\models\Qwen\Qwen3-ASR-0___6B
+C:\Users\15403\.cache\modelscope\hub\models\Qwen\Qwen3-ASR-1___7B
 ```
 
-Or create the environment with:
+可选降噪模型：
 
-```powershell
-.\setup.bat
+```text
+model/FRCRN语音降噪-单麦-16k
 ```
 
-## Run
+`model/` 目录不上传 GitHub，避免把大模型权重放进仓库。
+
+## 5. 使用方法
+
+### 场景一：日常快速语音输入
+
+什么时候用：想在任意输入框里快速口述中文、英文技术词或短句。
+
+1. 运行：
 
 ```powershell
-cd "E:\Projects\ai\sensevoice_ime"
 .\run.bat
 ```
 
-When the program starts, choose the text optimizer:
+2. 音频处理选择默认 `1`。
+3. 降噪默认选 `0`，只有环境很吵时再选 `1`。
+4. ASR device 选 `1` 使用 GPU；如果显示退回 CPU，说明 CUDA PyTorch 没装好。
+5. ASR engine 默认 `0` 是 SenseVoiceSmall；想试 Qwen 方言/混合识别时选 `1` 或 `2`。
+6. 把光标放到任意输入框。
+7. 按住 `` ` `` 说话，松开后等待自动粘贴。
+
+### 场景二：测试 Qwen3-ASR 是否真的用 GPU
+
+什么时候用：刚安装 CUDA PyTorch，想确认 0.6B / 1.7B 是否跑在显卡上。
+
+1. 启动程序。
+2. `ASR device` 选择 `1`。
+3. `ASR engine` 选择 `1` 或 `2`。
+4. 观察终端输出：
 
 ```text
-Text optimizer:
-  0 = off / keep current behavior
-  1 = Qwen3-0.6B
-  2 = Qwen3-1.7B
-Choose text optimizer [0/1/2, default 0]:
+[model] device: cuda:0
 ```
 
-Then:
+如果看到：
 
-1. Put the cursor in any text box.
-2. Hold the backtick key: `` ` ``.
-3. Speak.
-4. Release the key.
-5. Wait for transcription and paste.
+```text
+[device] GPU selected, but current PyTorch cannot see CUDA; falling back to CPU.
+[model] device: cpu
+```
 
-Press `Esc` to quit.
+说明当前虚拟环境仍是 CPU 版 PyTorch。
 
-## Runtime Commands
+### 场景三：复盘识别错误并更新热词
 
-Type this in the running terminal and press Enter:
+什么时候用：发现 `GitHub`、项目名、英文缩写被反复识别错。
+
+1. 打开：
+
+```text
+raw_transcripts.jsonl
+```
+
+2. 查看 `raw_text` 和 `final_text` 的差异。
+3. 把稳定、确定的错词修正写入：
+
+```text
+phrases.json
+```
+
+4. 程序运行中按 `ctrl+alt+r` 重新加载热词。
+
+### 场景四：运行中切换文本优化模型
+
+什么时候用：想在不重启程序的情况下，从关闭优化切到 Qwen3-0.6B 或 Qwen3-1.7B。
+
+1. 在运行程序的终端输入：
 
 ```text
 qqq
 ```
 
-The program will ask you to choose the text optimizer again. This lets you switch between off, Qwen3-0.6B, and Qwen3-1.7B without restarting the app.
-
-## Configuration
-
-Edit `config.json`:
-
-```json
-{
-  "model_path": "model/SenseVoiceSmall",
-  "language": "auto",
-  "device": "auto",
-  "qwen_0_6b_path": "model/千问3-0.6B",
-  "qwen_1_7b_path": "model/千问3-1.7B",
-  "prompt_text_optimizer_on_start": true,
-  "text_optimizer_default": "0",
-  "text_optimizer_max_new_tokens": 128,
-  "push_to_talk_hotkey": "`",
-  "sound_on_start": "sounds/start.wav",
-  "sound_on_stop": "sounds/stop.wav",
-  "pre_roll_seconds": 0.5,
-  "restrict_output_to_zh_en": true,
-  "hotkey_release_debounce_seconds": 0.12,
-  "log_raw_transcripts": true,
-  "raw_transcripts_path": "raw_transcripts.jsonl"
-}
-```
-
-Useful fields:
-
-| Key | Meaning |
-| --- | --- |
-| `model_path` | Local SenseVoiceSmall model path. |
-| `device` | `auto` uses CUDA when available, otherwise CPU. |
-| `qwen_0_6b_path` | Local Qwen3-0.6B path. |
-| `qwen_1_7b_path` | Local Qwen3-1.7B path. |
-| `prompt_text_optimizer_on_start` | Ask for `0/1/2` on startup. |
-| `text_optimizer_default` | Default optimizer mode. |
-| `text_optimizer_max_new_tokens` | Output limit for the text optimizer. |
-| `push_to_talk_hotkey` | Hold-to-record hotkey. |
-| `reload_phrases_hotkey` | Reload `phrases.json` without restarting. |
-| `open_phrases_hotkey` | Open `phrases.json`. |
-| `min_rms` | Quiet-audio threshold. |
-| `pre_roll_seconds` | Audio buffered before hotkey press to avoid clipped starts. |
-| `restrict_output_to_zh_en` | Filter accidental non-Chinese/non-English script output. |
-| `hotkey_release_debounce_seconds` | Debounce release events to reduce random recording stops. |
-| `log_raw_transcripts` | Record pre-Qwen ASR text for review. |
-| `raw_transcripts_path` | JSONL path for raw ASR logs. |
-
-## Phrase Replacements
-
-Edit `phrases.json` to correct repeated ASR mistakes before the optional Qwen pass:
-
-```json
-[
-  { "spoken": "cloud code", "replace": "Claude Code" },
-  { "spoken": "chat G", "replace": "ChatGPT" },
-  { "spoken": "sense voice", "replace": "SenseVoice" }
-]
-```
-
-Reload while the program is running:
+2. 回车。
+3. 重新选择：
 
 ```text
-Ctrl+Alt+R
+0 = off
+1 = Qwen3-0.6B
+2 = Qwen3-1.7B
 ```
 
-Open the file while running:
+## 6. 技术栈 / 工具链 / 依赖库
+
+| 层级 | 技术 | 用途 |
+| --- | --- | --- |
+| 语言 | Python 3.11 | 主程序、音频处理、模型调用。 |
+| ASR | FunASR + SenseVoiceSmall | 默认轻量本地语音识别。 |
+| ASR | qwen-asr + Transformers | 可选 Qwen3-ASR-0.6B / 1.7B。 |
+| 推理 | PyTorch CPU / CUDA | CPU 兼容运行，CUDA 用于 NVIDIA GPU 加速。 |
+| 音频录制 | sounddevice | 低延迟麦克风输入。 |
+| 音频文件 | soundfile | 临时 WAV 读写。 |
+| 热键 | keyboard | 全局按住说话、快捷键注册。 |
+| 剪贴板 | pyperclip | 自动粘贴识别结果。 |
+| 文本优化 | Transformers + 本地 Qwen3 | 修正 ASR 后文本。 |
+| 降噪 | ModelScope FRCRN pipeline | 可选单麦 16k 降噪。 |
+| 配置 | JSON | `config.json`、`phrases.json`、`raw_transcripts.jsonl`。 |
+
+主要依赖见 `requirements.txt`。
+
+## 7. 文件结构
 
 ```text
-Ctrl+Alt+P
+sensevoice_ime/
+├── sensevoice_ime.py          # 主程序：启动流程、ASR、热键、粘贴、日志
+├── config.json                # 本地配置：模型路径、设备选择、音频参数、热键
+├── phrases.json               # 热词/错词修正规则，已纳入仓库
+├── requirements.txt           # Python 依赖
+├── run.bat                    # 日常启动入口
+├── setup.bat                  # 环境初始化脚本
+├── test_model.bat             # 模型测试入口
+├── tools/
+│   ├── audio_processor.py     # InputGuard / OutputPolish 音频处理
+│   ├── noise_suppressor.py    # FRCRN 降噪封装，lazy load
+│   └── __init__.py
+├── sounds/                    # 开始/停止录音提示音
+├── model/                     # 本地模型目录，不上传 GitHub
+├── raw_transcripts.jsonl      # 私人原始识别日志，不上传 GitHub
+├── README.md                  # 项目说明
+└── DEV_LOG.md                 # 开发日志和设计决策
 ```
 
-## Qwen Model Files
+## 8. 常见问题
 
-A complete local Qwen model folder should contain files such as:
+Q: 为什么我选择 GPU，最后还是显示 CPU？
 
-```text
-config.json
-tokenizer.json
-generation_config.json
-model.safetensors
-```
+A: 说明当前 `.venv` 里的 PyTorch 是 CPU 版，或者 CUDA 不可见。先运行 GPU 检测命令，确认 `torch.cuda.is_available()` 是 `True`。如果不是，重新安装 CUDA 版 PyTorch。
 
-or sharded weights such as:
+Q: 看到 `[model] device: cuda:0` 是不是就说明用了 GPU？
 
-```text
-model-00001-of-00002.safetensors
-model-00002-of-00002.safetensors
-model.safetensors.index.json
-```
+A: 是。`cuda:0` 表示模型已经加载到第一张 NVIDIA GPU 上。
 
-If you choose `1` or `2` and the folder is incomplete, the app will report the missing file.
+Q: FRCRN 降噪为什么默认关闭？
 
-## Developer Commands
+A: 降噪模型加载慢，而且安静环境下不一定提升 ASR。现在它默认关闭，并且 lazy load，只有你选择开启并开始处理音频时才加载。
 
-List audio devices:
+Q: 为什么不把 AGC / 压缩器放在降噪前？
 
-```powershell
-.\.venv\Scripts\python.exe .\sensevoice_ime.py --list-devices
-```
+A: 降噪模型更喜欢自然动态范围的输入。提前 AGC 会把底噪一起拉高，压缩器也会抹平语音和噪声差异，所以当前链路是 `InputGuard -> FRCRN -> OutputPolish -> ASR`。
 
-Test the bundled SenseVoice sample:
+Q: `raw_transcripts.jsonl` 在 GitHub 上看不到？
 
-```powershell
-.\.venv\Scripts\python.exe .\sensevoice_ime.py --test-model
-```
+A: 这是私人语音识别日志，包含你的口述内容，所以被 git ignore。它只保存在本地。
 
-Record once without pasting:
+Q: PowerShell 里 `cd /d E:\...` 报错怎么办？
 
-```powershell
-.\.venv\Scripts\python.exe .\sensevoice_ime.py --once 3 --no-paste
-```
+A: PowerShell 用 `cd "E:\Projects\ai\sensevoice_ime"`，`/d` 是 CMD 的写法。
 
-Syntax check:
+Q: 安装 CUDA PyTorch 后出现 `~orch`、`~umpy` 临时目录警告怎么办？
 
-```powershell
-python -m py_compile sensevoice_ime.py
-```
+A: 通常不影响运行。确认程序能跑 GPU 后，可以再清理 `.venv\Lib\site-packages` 下这些 `~` 开头的临时残留。
 
-## Project Files
+Q: 那句 `generation flags are not valid and may be ignored: ['temperature']` 是错误吗？
 
-```text
-.
-|-- sensevoice_ime.py
-|-- config.json
-|-- phrases.json
-|-- requirements.txt
-|-- run.bat
-|-- setup.bat
-|-- test_model.bat
-|-- README.md
-|-- README_CN.md
-|-- DEV_LOG.md
-|-- DEV_LOG_CN.md
-`-- model/              # ignored by git
-```
+A: 不是致命错误，是 Transformers 的提醒，不影响 Qwen3-ASR 正常识别。
 
-## Known Limitations
+## 9. 未来开发路线图
 
-- This is not a native Windows IME driver.
-- It uses clipboard paste, so some apps can block or redirect paste.
-- The console window must stay open.
-- Model loading can take time, especially for Qwen3-1.7B.
-- Switching models unloads the previous optimizer and clears CUDA cache when available, but memory behavior still depends on PyTorch and the GPU driver.
+当前状态：稳定可用的本地语音输入 MVP，GPU 加速和多 ASR 后端已经打通。
 
-## Version 1.0.0
+近期：
 
-The `1.0.0` release marks the first complete local dictation workflow with optional local LLM text optimization and runtime model switching.
+- 轻量静音裁剪 —— 对讲话很慢、中间空白很多的录音，在送入 ASR 前删除长静音，减少 Qwen ASR 推理时间。
+- ASR 性能日志 —— 记录每次识别的模型、设备、音频时长、推理耗时，方便比较 SenseVoiceSmall / Qwen3-ASR-0.6B / 1.7B。
+- GPU 环境自检 —— 启动时更明确地区分“选择了 GPU”和“实际跑在 GPU”。
 
-## Changelog
+中期：
 
-### v1.1.0
+- 样本复盘工具 —— 从 `raw_transcripts.jsonl` 生成可标注的纠错样本，用于热词更新或后续微调。
+- 领域语言画像导入 —— 从个人笔记、网站、常用术语生成一份轻量 profile，作为文本优化上下文或热词来源。
+- 更细的音频策略配置 —— 针对安静房间、键盘噪声、远场麦克风分别保存参数。
 
-- Added raw ASR logging to `raw_transcripts.jsonl`, always recording text before Qwen optimization for review and future fine-tuning samples.
-- Added `pre_roll_seconds`, defaulting to 0.5 seconds, to reduce clipped sentence starts.
-- Added `restrict_output_to_zh_en` to filter accidental Korean/Japanese script output from SenseVoice auto language detection.
-- Added `hotkey_release_debounce_seconds` to reduce random stop/restart behavior while holding the push-to-talk key.
-- Added stronger GitHub hotword corrections for `G up`, `Goodub`, `good hub`, `get hub`, `hub 上`, and related variants.
-- Expanded `phrases.json` from 36 to 417 personal hotword rules covering Claude Code, ChatGPT, Wwise, WAAPI, SoundBank, TypeScript, UE5, MCP, RAG, and more.
-- Fixed phrase replacement ordering by applying longer rules first, preventing short rules such as `chat G` from breaking longer forms such as `chat g p t`.
-- Fixed repeated replacement inside already-correct English terms, preventing `GitHub` from becoming `GitGitHub`.
-- Fixed raw log worker metadata by passing `duration` and `rms` through the job queue.
-- Fixed `run.bat` / `setup.bat` to prefer `.venv` and added the missing `torchaudio` dependency.
-- Kept `phrases.json` tracked and uploaded; `raw_transcripts.jsonl` remains ignored to avoid publishing private dictation logs.
+长期愿景：
 
-### v1.0.0
+- 成为一个本地优先、可持续学习个人语言习惯的中文/英文混合语音输入工作台。
+- 差异化定位不是“通用语音助手”，而是“开发者和知识工作者自己的本地输入层”。
 
-- Added the complete local SenseVoice + optional Qwen3 text optimization workflow.
-- Added startup optimizer selection: off, Qwen3-0.6B, or Qwen3-1.7B.
-- Added runtime `qqq` model switching.
-- Added sound cues, quiet-audio guard, and editable phrase replacements.
+如何参与：
+
+- 有稳定复现的误识别，优先提交原始 ASR 文本、期望文本和场景说明。
+- 有新的模型后端，先做独立 engine 封装，再接入启动选择菜单。
+
+## 10. 更新日志
+
+v1.4.0 (2026-06-12) ✅ 新增 ASR CPU/GPU 启动选择，默认 GPU/CUDA 🔧 修复选择 GPU 但 PyTorch 不可见时无提示的问题 ⚡ 优化 FRCRN 降噪为 lazy load，避免启动阶段强制加载慢模型 ⚡ 完成 CUDA PyTorch 环境验证，Qwen3-ASR 可显示并运行在 `cuda:0` 📋 更新 README / DEV_LOG 为产品、技术、受众三维结构
+
+v1.3.0 (2026-06-12) ✅ 新增 ASR 引擎选择：SenseVoiceSmall / Qwen3-ASR-0.6B / Qwen3-ASR-1.7B ✅ 新增 Qwen3-ASR 本地 ModelScope 缓存路径配置 ✅ 原始日志增加 `asr_engine` 字段，便于比较模型效果
+
+v1.2.0 (2026-06-12) ✅ 新增 InputGuard / OutputPolish 分层音频处理 ✅ 新增可选 FRCRN 单麦 16k 降噪 🔄 统一音频链路为 `麦克风 -> InputGuard -> FRCRN -> OutputPolish -> ASR` ⚡ 避免在降噪前做 AGC / 压缩导致底噪被放大
+
+v1.1.0 (2026-06-11) ✅ 新增原始 ASR 日志 `raw_transcripts.jsonl` ✅ 新增 `phrases.json` 热词库并纳入仓库 🔧 修复 `duration` / `rms` 日志字段缺失 🔧 修复 `torchaudio` 缺失导致 FunASR 启动失败 ⚡ 优化预录音和热键释放防抖，减少开头截断和随机停止
+
+v1.0.0 (2026-06-11) 🚀 初始可用版本：SenseVoiceSmall 本地识别、按住说话、自动粘贴 ✅ 新增 Qwen3-0.6B / 1.7B 文本优化选择 ✅ 新增 `qqq` 运行中重选文本优化模型 📋 建立配置、热词、运行脚本和基础文档
