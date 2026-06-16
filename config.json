@@ -12,7 +12,7 @@
   "min_record_seconds": 0.3,
   "max_record_seconds": 60,
   "min_rms": 0.003,
-  "push_to_talk_hotkey": "`",
+  "push_to_talk_hotkey": "ctrl+alt+windows+l",
   "sound_on_start": "sounds/start.wav",
   "sound_on_stop": "sounds/stop.wav",
   "qwen_0_6b_path": "model/千问3-0.6B",
@@ -49,5 +49,11 @@
   "qwen_asr_max_inference_batch_size": 1,
   "qwen_asr_max_new_tokens": 256,
   "prompt_asr_device_on_start": true,
-  "asr_device_default": "1"
+  "asr_device_default": "1",
+  "system_audio_hotkey": "ctrl+alt+windows+m",
+  "system_audio_device_index": "auto",
+  "system_audio_channels": 2,
+  "system_audio_sample_rate": 16000,
+  "system_audio_downmix_to_mono": true,
+  "system_audio_min_rms": 0.0005
 }

@@ -470,6 +470,16 @@ def choose_text_optimizer_mode(config, current_mode=None):
 
 
 class Recorder:
+    SYSTEM_AUDIO_KEYWORDS = (
+        "loopback",
+        "stereo mix",
+        "what u hear",
+        "wave out",
+        "monitor",
+        "立体声混音",
+        "混音",
+    )
+
     def __init__(self, config):
         self.sd = require_import("sounddevice")
         self.sf = require_import("soundfile")
@@ -485,13 +495,21 @@ class Recorder:
         self.frames = []
         self.raw_frames = []
         self.stream = None
+        self.system_stream = None
         self.recording = False
+        self.active_source = "microphone"
+        self.active_device_name = "default microphone"
+        self.active_sample_rate = self.sample_rate
         self.started_at = None
         self.lock = threading.Lock()
 
     @property
     def is_recording(self):
         return self.recording
+
+    @property
+    def recording_source(self):
+        return self.active_source
 
     def ensure_stream(self):
         with self.lock:
@@ -505,9 +523,52 @@ class Recorder:
             )
             self.stream.start()
             mode = "on" if self.input_guard.enabled else "off"
-            print(f"[audio] stream ready, pre-roll={self.pre_roll_seconds:.2f}s, input_guard={mode}")
+            print(f"[audio] microphone stream ready, pre-roll={self.pre_roll_seconds:.2f}s, input_guard={mode}")
 
-    def start(self):
+    def find_system_audio_device(self):
+        configured = self.config.get("system_audio_device_index", None)
+        devices = self.sd.query_devices()
+        if configured not in (None, "", "auto"):
+            index = int(configured)
+            info = devices[index]
+            if int(info.get("max_input_channels", 0)) <= 0:
+                raise RuntimeError(f"Configured system audio device is not an input device: {index} {info.get('name')}")
+            return index, info
+
+        best = None
+        for index, info in enumerate(devices):
+            if int(info.get("max_input_channels", 0)) <= 0:
+                continue
+            name = str(info.get("name", ""))
+            lower_name = name.lower()
+            score = 0
+            for keyword in self.SYSTEM_AUDIO_KEYWORDS:
+                if keyword in lower_name or keyword in name:
+                    score = max(score, 100 if keyword in ("loopback", "stereo mix", "立体声混音") else 70)
+            if score <= 0:
+                continue
+            hostapi_name = ""
+            try:
+                hostapi_name = self.sd.query_hostapis()[int(info.get("hostapi", -1))].get("name", "")
+            except Exception:
+                hostapi_name = ""
+            if "WASAPI" in hostapi_name:
+                score += 10
+            if best is None or score > best[0]:
+                best = (score, index, info)
+        if best is None:
+            raise RuntimeError(
+                "No system-audio input device found. Enable Stereo Mix/Loopback in Windows Sound settings, "
+                "or set system_audio_device_index in config.json."
+            )
+        return best[1], best[2]
+
+    def start(self, source="microphone"):
+        if source == "system":
+            return self.start_system_audio()
+        return self.start_microphone()
+
+    def start_microphone(self):
         self.ensure_stream()
         with self.lock:
             if self.recording:
@@ -515,15 +576,71 @@ class Recorder:
             self.input_guard.reset()
             self.frames = [frame.copy() for frame in self.pre_frames]
             self.raw_frames = [frame.copy() for frame in self.pre_raw_frames]
+            self.active_source = "microphone"
+            self.active_device_name = "default microphone"
+            self.active_sample_rate = self.sample_rate
             self.started_at = time.time()
             self.recording = True
             return True
+
+    def start_system_audio(self):
+        with self.lock:
+            if self.recording:
+                return False
+            self.input_guard.reset()
+            self.frames = []
+            self.raw_frames = []
+            self.active_source = "system"
+            self.started_at = time.time()
+            self.recording = True
+        try:
+            device_index, info = self.find_system_audio_device()
+            max_channels = max(1, int(info.get("max_input_channels", 1)))
+            requested_channels = int(self.config.get("system_audio_channels", 2))
+            channels = max(1, min(requested_channels, max_channels))
+            default_sr = int(float(info.get("default_samplerate", self.sample_rate) or self.sample_rate))
+            requested_sr = int(self.config.get("system_audio_sample_rate", self.sample_rate))
+            self.active_device_name = str(info.get("name", f"device {device_index}"))
+            self.system_stream = self._open_system_stream(device_index, channels, requested_sr, default_sr)
+            self.system_stream.start()
+            print(f"[audio] system stream ready, device={device_index} {self.active_device_name}, sample_rate={self.active_sample_rate}, channels={channels}")
+            return True
+        except Exception:
+            with self.lock:
+                self.recording = False
+                self.frames = []
+                self.raw_frames = []
+                self.active_source = "microphone"
+            raise
+
+    def _open_system_stream(self, device_index, channels, requested_sr, default_sr):
+        last_error = None
+        for sample_rate in dict.fromkeys([requested_sr, default_sr, self.sample_rate]):
+            try:
+                stream = self.sd.InputStream(
+                    samplerate=int(sample_rate),
+                    channels=channels,
+                    dtype="float32",
+                    device=device_index,
+                    callback=self._system_callback,
+                )
+                self.active_sample_rate = int(sample_rate)
+                return stream
+            except Exception as exc:
+                last_error = exc
+        raise RuntimeError(f"Could not open system audio device: {last_error}")
 
     def _trim_pre_roll_locked(self):
         while self.pre_frame_samples > self.pre_roll_samples and self.pre_frames:
             old = self.pre_frames.popleft()
             self.pre_raw_frames.popleft()
             self.pre_frame_samples -= old.shape[0]
+
+    def _to_mono_if_needed(self, chunk):
+        audio = np.asarray(chunk, dtype=np.float32)
+        if bool(self.config.get("system_audio_downmix_to_mono", True)) and audio.ndim == 2 and audio.shape[1] > 1:
+            return np.mean(audio, axis=1, keepdims=True).astype(np.float32)
+        return audio.copy()
 
     def _callback(self, indata, frames, time_info, status):
         if status:
@@ -536,23 +653,49 @@ class Recorder:
                 self.pre_raw_frames.append(raw_chunk.copy())
                 self.pre_frame_samples += processed_chunk.shape[0]
                 self._trim_pre_roll_locked()
-            if self.recording:
+            if self.recording and self.active_source == "microphone":
+                self.frames.append(processed_chunk.copy())
+                self.raw_frames.append(raw_chunk.copy())
+
+    def _system_callback(self, indata, frames, time_info, status):
+        if status:
+            print(f"[system-audio] {status}")
+        raw_chunk = self._to_mono_if_needed(indata)
+        processed_chunk = self.input_guard.process_chunk(raw_chunk)
+        with self.lock:
+            if self.recording and self.active_source == "system":
                 self.frames.append(processed_chunk.copy())
                 self.raw_frames.append(raw_chunk.copy())
 
     def stop_to_wav(self):
+        system_stream = None
         with self.lock:
             if not self.recording:
-                empty_stats = {"enabled": self.input_guard.enabled, "mode": "input_guard_only" if self.input_guard.enabled else "off", "raw_rms": 0.0, "raw_peak": 0.0, "guarded_rms": 0.0, "guarded_peak": 0.0, "processed_rms": 0.0, "processed_peak": 0.0}
+                empty_stats = {"enabled": self.input_guard.enabled, "mode": "input_guard_only" if self.input_guard.enabled else "off", "source": self.active_source, "raw_rms": 0.0, "raw_peak": 0.0, "guarded_rms": 0.0, "guarded_peak": 0.0, "processed_rms": 0.0, "processed_peak": 0.0}
                 return None, 0.0, 0.0, 0.0, empty_stats
             self.recording = False
             duration = time.time() - (self.started_at or time.time())
             frames = [frame.copy() for frame in self.frames]
             raw_frames = [frame.copy() for frame in self.raw_frames]
+            source = self.active_source
+            device_name = self.active_device_name
+            sample_rate = self.active_sample_rate
+            if source == "system":
+                system_stream = self.system_stream
+                self.system_stream = None
             self.frames = []
             self.raw_frames = []
+            self.active_source = "microphone"
+            self.active_device_name = "default microphone"
+            self.active_sample_rate = self.sample_rate
+        if system_stream is not None:
+            try:
+                system_stream.stop()
+                system_stream.close()
+            except Exception as exc:
+                print(f"[system-audio] stream close warning: {exc}")
         if not frames:
-            empty_stats = {"enabled": self.input_guard.enabled, "mode": "input_guard_only" if self.input_guard.enabled else "off", "raw_rms": 0.0, "raw_peak": 0.0, "guarded_rms": 0.0, "guarded_peak": 0.0, "processed_rms": 0.0, "processed_peak": 0.0}
+            empty_stats = {"enabled": self.input_guard.enabled, "mode": "input_guard_only" if self.input_guard.enabled else "off", "source": source, "device": device_name, "sample_rate": sample_rate, "raw_rms": 0.0, "raw_peak": 0.0, "guarded_rms": 0.0, "guarded_peak": 0.0, "processed_rms": 0.0, "processed_peak": 0.0}
             return None, duration, 0.0, 0.0, empty_stats
         audio = np.concatenate(frames, axis=0)
         raw_audio = np.concatenate(raw_frames, axis=0) if raw_frames else audio
@@ -563,6 +706,9 @@ class Recorder:
         audio_stats = {
             "enabled": bool(self.input_guard.enabled),
             "mode": "input_guard_only" if self.input_guard.enabled else "off",
+            "source": source,
+            "device": device_name,
+            "sample_rate": sample_rate,
             "raw_rms": raw_rms,
             "raw_peak": raw_peak,
             "guarded_rms": guarded_rms,
@@ -573,7 +719,7 @@ class Recorder:
         }
         fd, name = tempfile.mkstemp(prefix="sensevoice_ime_", suffix=".wav")
         os.close(fd)
-        self.sf.write(name, audio, self.sample_rate)
+        self.sf.write(name, audio, sample_rate)
         return Path(name), duration, raw_rms, guarded_rms, audio_stats
 
 def paste_text(text, restore_clipboard=False):
@@ -606,10 +752,12 @@ class ImeApp:
         self.jobs = queue.Queue()
         self.busy = False
         self.normalized_push_to_talk = None
+        self.normalized_system_audio_hotkey = None
 
     def print_help(self):
         print("SenseVoice IME MVP")
-        print(f"  Hold to record   : {self.config.get('push_to_talk_hotkey', '`')}")
+        print(f"  Toggle microphone : {self.config.get('push_to_talk_hotkey', 'ctrl+alt+windows+l')}")
+        print(f"  Toggle system audio: {self.config.get('system_audio_hotkey', 'ctrl+alt+windows+m')}")
         print(f"  Reload phrases   : {self.config.get('reload_phrases_hotkey', 'ctrl+alt+r')}")
         print(f"  Open phrases     : {self.config.get('open_phrases_hotkey', 'ctrl+alt+p')}")
         print("  Rechoose model   : type qqq + Enter in this terminal")
@@ -630,53 +778,89 @@ class ImeApp:
         self.engine.load()
         self.text_optimizer.load()
         self.recorder.ensure_stream()
-        push_to_talk = self.config.get("push_to_talk_hotkey", "`")
+        push_to_talk = self.config.get("push_to_talk_hotkey", "ctrl+alt+windows+l")
+        system_audio_hotkey = self.config.get("system_audio_hotkey", "ctrl+alt+windows+m")
         self.register_push_to_talk(keyboard, push_to_talk)
+        self.register_system_audio_hotkey(keyboard, system_audio_hotkey)
         keyboard.add_hotkey(self.config.get("reload_phrases_hotkey", "ctrl+alt+r"), self.reload_phrases)
         keyboard.add_hotkey(self.config.get("open_phrases_hotkey", "ctrl+alt+p"), self.open_phrases_file)
         worker = threading.Thread(target=self.worker_loop, daemon=True)
         worker.start()
         command_listener = threading.Thread(target=self.command_loop, daemon=True)
         command_listener.start()
-        print("[ready] Put your cursor in any text box, hold the push-to-talk hotkey, speak, then release it.")
+        print("[ready] Put your cursor in any text box, press the hotkey once to record, press it again to transcribe.")
         keyboard.wait("esc")
         print("[quit]")
 
     def register_push_to_talk(self, keyboard, hotkey):
         normalized = normalize_hotkey_for_keyboard(hotkey)
         self.normalized_push_to_talk = normalized
-        # Register with suppress=True so the combo is intercepted before
-        # focused applications (e.g. VS Code / Codex) can handle it.
         keyboard.add_hotkey(
             normalized,
-            self.start_recording,
+            lambda: self.toggle_recording("microphone"),
             suppress=True,
             trigger_on_release=False,
         )
+        print(f"[hotkey] registered microphone toggle as {normalized} (suppressed)")
+
+    def register_system_audio_hotkey(self, keyboard, hotkey):
+        normalized = normalize_hotkey_for_keyboard(hotkey)
+        self.normalized_system_audio_hotkey = normalized
         keyboard.add_hotkey(
             normalized,
-            lambda: self.stop_recording_if_needed(force=False),
+            lambda: self.toggle_recording("system"),
             suppress=True,
-            trigger_on_release=True,
+            trigger_on_release=False,
         )
-        print(f"[hotkey] registered push-to-talk as {normalized} (suppressed)")
+        print(f"[hotkey] registered system-audio toggle as {normalized} (suppressed)")
 
-    def start_recording(self):
+
+    def toggle_recording(self, source="microphone"):
+        if self.recorder.is_recording:
+            active_source = self.recorder.recording_source
+            if active_source == source:
+                self.stop_recording_if_needed(source=source, force=True)
+            else:
+                print(f"[recording] already recording ({active_source}); press its hotkey to stop first")
+            return
+        self.start_recording(source)
+
+    def hotkey_for_source(self, source):
+        if source == "system":
+            return self.normalized_system_audio_hotkey
+        return self.normalized_push_to_talk
+
+    def start_recording(self, source="microphone"):
+        if source == "microphone" and self.normalized_system_audio_hotkey:
+            try:
+                keyboard = require_import("keyboard")
+                if keyboard.is_pressed(self.normalized_system_audio_hotkey):
+                    return
+            except Exception:
+                pass
         if self.busy:
             print("[busy] transcription is still running")
             return
         if self.recorder.is_recording:
             return
-        if self.recorder.start():
+        try:
+            started = self.recorder.start(source=source)
+        except Exception as exc:
+            print(f"[recording] failed to start {source}: {exc}")
+            return
+        if started:
             start_sound = self.config.get("sound_on_start", True)
             if start_sound is not False:
                 play_sound(start_sound, default_freq=880, default_duration=0.08)
-            print("[recording] started")
+            print(f"[recording] started ({source})")
             max_seconds = float(self.config.get("max_record_seconds", 60))
-            threading.Timer(max_seconds, lambda: self.stop_recording_if_needed(force=True)).start()
+            threading.Timer(max_seconds, lambda: self.stop_recording_if_needed(source=source, force=True)).start()
 
-    def stop_recording_if_needed(self, force=False):
+    def stop_recording_if_needed(self, source=None, force=False):
         if not self.recorder.is_recording:
+            return
+        active_source = self.recorder.recording_source
+        if source and source != active_source:
             return
         if not force:
             debounce_seconds = float(self.config.get("hotkey_release_debounce_seconds", 0.12))
@@ -684,7 +868,8 @@ class ImeApp:
                 time.sleep(debounce_seconds)
             try:
                 keyboard = require_import("keyboard")
-                if self.normalized_push_to_talk and keyboard.is_pressed(self.normalized_push_to_talk):
+                active_hotkey = self.hotkey_for_source(active_source)
+                if active_hotkey and keyboard.is_pressed(active_hotkey):
                     print("[hotkey] ignored release bounce")
                     return
             except Exception:
@@ -699,6 +884,8 @@ class ImeApp:
             print("[skip] recording too short")
             return
         min_rms = float(self.config.get("min_rms", 0.0))
+        if audio_stats.get("source") == "system":
+            min_rms = float(self.config.get("system_audio_min_rms", min_rms))
         if rms < min_rms:
             print(f"[skip] audio too quiet, rms {rms:.4f} < {min_rms:.4f}")
             Path(wav_path).unlink(missing_ok=True)
