@@ -1,6 +1,7 @@
 import argparse
 from collections import deque
 from datetime import datetime
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 import json
 import os
 import queue
@@ -9,6 +10,8 @@ import sys
 import tempfile
 import threading
 import time
+import urllib.parse
+import webbrowser
 from pathlib import Path
 
 import numpy as np
@@ -19,6 +22,7 @@ from tools.noise_suppressor import NoiseSuppressor, choose_noise_suppression_mod
 CONFIG_PATH = Path(__file__).with_name("config.json")
 PHRASES_PATH = Path(__file__).with_name("phrases.json")
 RAW_TRANSCRIPTS_PATH = Path(__file__).with_name("raw_transcripts.jsonl")
+FRONTEND_PATH = Path(__file__).resolve().parent.parent / "sensevoice_ime_frontend"
 
 
 class MissingDependency(RuntimeError):
@@ -36,12 +40,19 @@ def require_import(name, package_hint=None):
 def load_json(path, default):
     if not path.exists():
         return default
-    with path.open("r", encoding="utf-8") as f:
+    with path.open("r", encoding="utf-8-sig") as f:
         return json.load(f)
 
 
 def load_config():
     return load_json(CONFIG_PATH, {})
+
+
+def save_config(config):
+    CONFIG_PATH.write_text(
+        json.dumps(config, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
 
 
 def load_phrases():
@@ -91,6 +102,121 @@ def resolve_project_path(config_value, default_path):
     if not path.is_absolute():
         path = CONFIG_PATH.parent / path
     return path
+
+
+MODEL_DEFINITIONS = {
+    "model_path": {
+        "label": "SenseVoiceSmall",
+        "names": ["SenseVoiceSmall"],
+        "required": ["configuration.json", "config.yaml", "am.mvn"],
+    },
+    "qwen_0_6b_path": {
+        "label": "Qwen3-0.6B",
+        "names": ["Qwen3-0.6B", "Qwen3-0___6B", "Qwen3-0_6B"],
+        "required": ["config.json"],
+    },
+    "qwen_1_7b_path": {
+        "label": "Qwen3-1.7B",
+        "names": ["Qwen3-1.7B", "Qwen3-1___7B", "Qwen3-1_7B"],
+        "required": ["config.json"],
+    },
+    "qwen_asr_0_6b_path": {
+        "label": "Qwen3-ASR-0.6B",
+        "names": ["Qwen3-ASR-0.6B", "Qwen3-ASR-0___6B", "Qwen3-ASR-0_6B"],
+        "required": ["config.json"],
+    },
+    "qwen_asr_1_7b_path": {
+        "label": "Qwen3-ASR-1.7B",
+        "names": ["Qwen3-ASR-1.7B", "Qwen3-ASR-1___7B", "Qwen3-ASR-1_7B"],
+        "required": ["config.json"],
+    },
+    "noise_suppression_model_path": {
+        "label": "FRCRN noise suppression",
+        "names": ["FRCRN语音降噪-单麦-16k", "FRCRN", "speech_frcrn_ans_cirm_16k"],
+        "required": [],
+    },
+}
+
+
+def model_search_roots():
+    roots = [
+        CONFIG_PATH.parent / "model",
+        CONFIG_PATH.parent.parent / "model",
+        Path.cwd() / "model",
+        Path.home() / ".cache" / "modelscope" / "hub" / "models",
+        Path.home() / ".cache" / "huggingface" / "hub",
+    ]
+    for drive in "CDEFGHIJKLMNOPQRSTUVWXYZ":
+        drive_root = Path(f"{drive}:\\")
+        if drive_root.exists():
+            roots.extend([
+                drive_root / "model",
+                drive_root / "models",
+                drive_root / "AI" / "models",
+                drive_root / "Projects" / "ai",
+            ])
+    unique = []
+    seen = set()
+    for root in roots:
+        try:
+            resolved = root.resolve()
+        except Exception:
+            resolved = root
+        key = str(resolved).lower()
+        if key not in seen and root.exists():
+            seen.add(key)
+            unique.append(root)
+    return unique
+
+
+def model_dir_matches(path, definition):
+    if not path.is_dir():
+        return False
+    name = path.name.lower()
+    expected_names = [item.lower() for item in definition["names"]]
+    if not any(expected in name for expected in expected_names):
+        return False
+    required = definition.get("required", [])
+    return not required or any((path / marker).exists() for marker in required)
+
+
+def find_model_dir(definition, max_depth=5):
+    for root in model_search_roots():
+        stack = [(root, 0)]
+        while stack:
+            current, depth = stack.pop()
+            if model_dir_matches(current, definition):
+                return current
+            if depth >= max_depth:
+                continue
+            try:
+                children = [child for child in current.iterdir() if child.is_dir()]
+            except Exception:
+                continue
+            stack.extend((child, depth + 1) for child in children)
+    return None
+
+
+def discover_models(config, persist=False, verbose=True):
+    found = {}
+    changed = {}
+    for key, definition in MODEL_DEFINITIONS.items():
+        configured = resolve_project_path(config.get(key), CONFIG_PATH.parent / "model")
+        if configured.exists():
+            found[key] = str(configured)
+            continue
+        discovered = find_model_dir(definition)
+        if discovered:
+            config[key] = str(discovered)
+            found[key] = str(discovered)
+            changed[key] = str(discovered)
+            if verbose:
+                print(f"[model-scan] {definition['label']}: {discovered}")
+        elif verbose:
+            print(f"[model-scan] {definition['label']}: not found")
+    if changed and persist:
+        save_config(config)
+    return {"found": found, "changed": changed}
 
 
 def append_raw_transcript_log(config, entry):
@@ -217,6 +343,9 @@ class SenseVoiceEngine:
             return
         model_path = Path(self.config.get("model_path", "")).expanduser()
         if not model_path.exists():
+            discover_models(self.config, persist=True)
+            model_path = Path(self.config.get("model_path", "")).expanduser()
+        if not model_path.exists():
             raise FileNotFoundError(f"Model path does not exist: {model_path}")
         from funasr import AutoModel
         print(f"[model] loading SenseVoice from {model_path}")
@@ -272,6 +401,9 @@ class QwenAsrEngine:
         if self.model is not None:
             return
         model_path = self.model_path()
+        if not model_path.exists():
+            discover_models(self.config, persist=True)
+            model_path = self.model_path()
         if not model_path.exists():
             raise FileNotFoundError(f"Qwen ASR model path does not exist: {model_path}")
         if not (model_path / "config.json").exists():
@@ -350,6 +482,9 @@ class TextOptimizer:
         if not self.enabled or self.model is not None:
             return
         model_path = self.model_path()
+        if not model_path.exists():
+            discover_models(self.config, persist=True)
+            model_path = self.model_path()
         if not model_path.exists():
             raise FileNotFoundError(f"Text optimizer model path does not exist: {model_path}")
         if not (model_path / "config.json").exists():
@@ -739,9 +874,33 @@ def paste_text(text, restore_clipboard=False):
         pyperclip.copy(old_clipboard)
 
 
+class VoiceStateBus:
+    def __init__(self):
+        self.subscribers = []
+        self.lock = threading.Lock()
+
+    def publish(self, payload):
+        with self.lock:
+            subscribers = list(self.subscribers)
+        for subscriber in subscribers:
+            subscriber.put(payload)
+
+    def subscribe(self):
+        subscriber = queue.Queue()
+        with self.lock:
+            self.subscribers.append(subscriber)
+        return subscriber
+
+    def unsubscribe(self, subscriber):
+        with self.lock:
+            if subscriber in self.subscribers:
+                self.subscribers.remove(subscriber)
+
+
 class ImeApp:
     def __init__(self, config):
         self.config = config
+        self.state_bus = VoiceStateBus()
         self.phrases = load_phrases()
         self.engine = create_asr_engine(config)
         self.optimizer_lock = threading.RLock()
@@ -756,10 +915,10 @@ class ImeApp:
 
     def print_help(self):
         print("SenseVoice IME MVP")
-        print(f"  Toggle microphone : {self.config.get('push_to_talk_hotkey', 'ctrl+alt+windows+l')}")
-        print(f"  Toggle system audio: {self.config.get('system_audio_hotkey', 'ctrl+alt+windows+m')}")
-        print(f"  Reload phrases   : {self.config.get('reload_phrases_hotkey', 'ctrl+alt+r')}")
-        print(f"  Open phrases     : {self.config.get('open_phrases_hotkey', 'ctrl+alt+p')}")
+        print(f"  Toggle microphone : {self.config.get('push_to_talk_hotkey', 'f8')}")
+        print(f"  Toggle system audio: {self.config.get('system_audio_hotkey', 'f9')}")
+        print(f"  Reload phrases   : {self.config.get('reload_phrases_hotkey', 'f6')}")
+        print(f"  Open phrases     : {self.config.get('open_phrases_hotkey', 'f7')}")
         print("  Rechoose model   : type qqq + Enter in this terminal")
         print("  Quit             : esc")
         print(f"  ASR engine       : {self.engine.name}")
@@ -778,8 +937,8 @@ class ImeApp:
         self.engine.load()
         self.text_optimizer.load()
         self.recorder.ensure_stream()
-        push_to_talk = self.config.get("push_to_talk_hotkey", "ctrl+alt+windows+l")
-        system_audio_hotkey = self.config.get("system_audio_hotkey", "ctrl+alt+windows+m")
+        push_to_talk = self.config.get("push_to_talk_hotkey", "f8")
+        system_audio_hotkey = self.config.get("system_audio_hotkey", "f9")
         self.register_push_to_talk(keyboard, push_to_talk)
         self.register_system_audio_hotkey(keyboard, system_audio_hotkey)
         keyboard.add_hotkey(self.config.get("reload_phrases_hotkey", "ctrl+alt+r"), self.reload_phrases)
@@ -798,10 +957,10 @@ class ImeApp:
         keyboard.add_hotkey(
             normalized,
             lambda: self.toggle_recording("microphone"),
-            suppress=True,
+            suppress=bool(self.config.get("hotkey_suppress", False)),
             trigger_on_release=False,
         )
-        print(f"[hotkey] registered microphone toggle as {normalized} (suppressed)")
+        print(f"[hotkey] registered microphone toggle as {normalized} (suppress={bool(self.config.get('hotkey_suppress', False))})")
 
     def register_system_audio_hotkey(self, keyboard, hotkey):
         normalized = normalize_hotkey_for_keyboard(hotkey)
@@ -809,10 +968,10 @@ class ImeApp:
         keyboard.add_hotkey(
             normalized,
             lambda: self.toggle_recording("system"),
-            suppress=True,
+            suppress=bool(self.config.get("hotkey_suppress", False)),
             trigger_on_release=False,
         )
-        print(f"[hotkey] registered system-audio toggle as {normalized} (suppressed)")
+        print(f"[hotkey] registered system-audio toggle as {normalized} (suppress={bool(self.config.get('hotkey_suppress', False))})")
 
 
     def toggle_recording(self, source="microphone"):
@@ -853,6 +1012,13 @@ class ImeApp:
             if start_sound is not False:
                 play_sound(start_sound, default_freq=880, default_duration=0.08)
             print(f"[recording] started ({source})")
+            self.state_bus.publish({
+                "status": "recording",
+                "source": source,
+                "hint": "正在录音",
+                "title": "正在录音",
+                "subtitle": "声音输入中",
+            })
             max_seconds = float(self.config.get("max_record_seconds", 60))
             threading.Timer(max_seconds, lambda: self.stop_recording_if_needed(source=source, force=True)).start()
 
@@ -879,9 +1045,17 @@ class ImeApp:
             play_sound(stop_sound, default_freq=440, default_duration=0.12)
         wav_path, duration, rms, processed_rms, audio_stats = self.recorder.stop_to_wav()
         print(f"[recording] stopped after {duration:.1f}s, rms={rms:.4f}, processed_rms={processed_rms:.4f}")
+        self.state_bus.publish({
+            "status": "processing",
+            "source": active_source,
+            "hint": "正在识别",
+            "title": "识别中",
+            "subtitle": "请稍候",
+        })
         min_seconds = float(self.config.get("min_record_seconds", 0.3))
         if not wav_path or duration < min_seconds:
             print("[skip] recording too short")
+            self.state_bus.publish({"status": "idle", "hint": "录音太短，已跳过"})
             return
         min_rms = float(self.config.get("min_rms", 0.0))
         if audio_stats.get("source") == "system":
@@ -889,6 +1063,7 @@ class ImeApp:
         if rms < min_rms:
             print(f"[skip] audio too quiet, rms {rms:.4f} < {min_rms:.4f}")
             Path(wav_path).unlink(missing_ok=True)
+            self.state_bus.publish({"status": "idle", "hint": "声音太小，已跳过"})
             return
         self.jobs.put((wav_path, duration, rms, processed_rms, audio_stats))
 
@@ -967,8 +1142,17 @@ class ImeApp:
                 if text and self.config.get("paste_after_transcribe", True):
                     paste_text(text, bool(self.config.get("restore_clipboard", False)))
                     print("[paste] sent to active input")
+                self.state_bus.publish({
+                    "status": "done",
+                    "text": text,
+                    "source": audio_stats.get("source", "microphone"),
+                    "hint": "识别完成",
+                    "title": "完成",
+                    "subtitle": "文本已输出",
+                })
             except Exception as exc:
                 print(f"[error] {exc}")
+                self.state_bus.publish({"status": "idle", "hint": f"错误：{exc}"})
             finally:
                 try:
                     Path(wav_path).unlink(missing_ok=True)
@@ -978,6 +1162,8 @@ class ImeApp:
                     pass
                 self.busy = False
                 self.jobs.task_done()
+                if not self.recorder.is_recording:
+                    self.state_bus.publish({"status": "idle", "hint": "按快捷键开始录音"})
 
     def command_loop(self):
         print("[command] Type qqq then Enter to rechoose the text optimizer model.")
@@ -994,11 +1180,72 @@ class ImeApp:
             elif command:
                 print(f"[command] unknown command: {command}")
 
-    def rechoose_text_optimizer(self):
+    def runtime_snapshot(self):
+        return {
+            "audio_processing_enabled": bool(self.config.get("audio_processing_enabled", True)),
+            "noise_suppression_enabled": bool(self.config.get("noise_suppression_enabled", False)),
+            "asr_device_mode": str(self.config.get("asr_device_mode", self.config.get("asr_device_default", "1"))),
+            "asr_engine_mode": str(self.config.get("asr_engine_mode", self.config.get("asr_engine_default", "0"))),
+            "text_optimizer_default": str(self.text_optimizer.mode),
+            "text_optimizer_name": self.text_optimizer.name,
+            "asr_engine_name": self.engine.name,
+            "busy": bool(self.busy),
+            "recording": bool(self.recorder.is_recording),
+        }
+
+    def apply_runtime_config(self, updates):
+        if self.recorder.is_recording or self.busy:
+            raise RuntimeError("当前正在录音或识别，等空闲后再切换模型相关选项。")
+
+        changed = {}
+
+        if "audio_processing_enabled" in updates:
+            enabled = bool(updates["audio_processing_enabled"])
+            self.config["audio_processing_enabled"] = enabled
+            self.recorder.input_guard.enabled = enabled
+            self.output_polish.enabled = enabled and bool(self.config.get("audio_output_polish_enabled", True))
+            changed["audio_processing_enabled"] = enabled
+
+        if "noise_suppression_enabled" in updates:
+            enabled = bool(updates["noise_suppression_enabled"])
+            self.config["noise_suppression_enabled"] = enabled
+            self.noise_suppressor.enabled = enabled
+            changed["noise_suppression_enabled"] = enabled
+
+        if "text_optimizer_default" in updates:
+            mode = str(updates["text_optimizer_default"])
+            if mode not in TextOptimizer.MODES:
+                raise ValueError("text_optimizer_default must be 0, 1, or 2")
+            self.set_text_optimizer_mode(mode)
+            self.config["text_optimizer_default"] = mode
+            changed["text_optimizer_default"] = mode
+
+        if "asr_device_mode" in updates:
+            mode = str(updates["asr_device_mode"])
+            if mode not in {"0", "1"}:
+                raise ValueError("asr_device_mode must be 0 or 1")
+            self.config["asr_device_default"] = mode
+            self.config["asr_device_mode"] = mode
+            self.config["device"] = "cuda:0" if mode == "1" else "cpu"
+            changed["asr_device_mode"] = mode
+
+        if "asr_engine_mode" in updates:
+            mode = str(updates["asr_engine_mode"])
+            if mode not in {"0", "1", "2"}:
+                raise ValueError("asr_engine_mode must be 0, 1, or 2")
+            self.config["asr_engine_default"] = mode
+            self.config["asr_engine_mode"] = mode
+            self.engine = SenseVoiceEngine(self.config) if mode == "0" else QwenAsrEngine(self.config, mode)
+            changed["asr_engine_mode"] = mode
+            changed["asr_engine_name"] = self.engine.name
+
+        if changed:
+            save_config(self.config)
+        return {"changed": changed, "config": self.runtime_snapshot()}
+
+    def set_text_optimizer_mode(self, new_mode):
         current_mode = self.text_optimizer.mode
-        new_mode = choose_text_optimizer_mode(self.config, current_mode=current_mode)
         if new_mode == current_mode:
-            print(f"[optimizer] unchanged: {self.text_optimizer.name}")
             return
         new_optimizer = TextOptimizer(self.config, new_mode)
         with self.optimizer_lock:
@@ -1009,9 +1256,21 @@ class ImeApp:
             except Exception as exc:
                 print(f"[optimizer] failed to switch: {exc}")
                 self.text_optimizer = TextOptimizer(self.config, "0")
+                self.config["text_optimizer_default"] = "0"
                 print("[optimizer] switched to off")
-                return
+                raise
         print(f"[optimizer] switched to {self.text_optimizer.name}")
+
+    def rechoose_text_optimizer(self):
+        current_mode = self.text_optimizer.mode
+        new_mode = choose_text_optimizer_mode(self.config, current_mode=current_mode)
+        if new_mode == current_mode:
+            print(f"[optimizer] unchanged: {self.text_optimizer.name}")
+            return
+        try:
+            self.set_text_optimizer_mode(new_mode)
+        except Exception:
+            return
 
     def reload_phrases(self):
         self.phrases = load_phrases()
@@ -1022,6 +1281,91 @@ class ImeApp:
             PHRASES_PATH.write_text("[]\n", encoding="utf-8")
         os.startfile(str(PHRASES_PATH))
         print(f"[phrases] opened {PHRASES_PATH}")
+
+
+def make_control_handler(app):
+    class ControlHandler(SimpleHTTPRequestHandler):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, directory=str(FRONTEND_PATH), **kwargs)
+
+        def end_headers(self):
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type")
+            super().end_headers()
+
+        def do_OPTIONS(self):
+            self.send_response(204)
+            self.end_headers()
+
+        def do_GET(self):
+            path = urllib.parse.urlparse(self.path).path
+            if path == "/api/config":
+                self.write_json({"ok": True, "config": app.runtime_snapshot()})
+                return
+            if path == "/events":
+                self.stream_events()
+                return
+            if path == "/":
+                self.path = "/index.html"
+            super().do_GET()
+
+        def do_POST(self):
+            path = urllib.parse.urlparse(self.path).path
+            if path != "/api/config":
+                self.send_error(404)
+                return
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+                raw = self.rfile.read(length).decode("utf-8") if length else "{}"
+                payload = json.loads(raw or "{}")
+                result = app.apply_runtime_config(payload)
+                self.write_json({"ok": True, **result})
+                app.state_bus.publish({"status": "idle", "hint": "设置已更新"})
+            except Exception as exc:
+                self.write_json({"ok": False, "error": str(exc)}, status=400)
+
+        def stream_events(self):
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+            self.send_header("Cache-Control", "no-cache")
+            self.end_headers()
+            subscriber = app.state_bus.subscribe()
+            try:
+                self.write_event({"status": "idle", "hint": "已连接 SenseVoice IME"})
+                while True:
+                    self.write_event(subscriber.get())
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+            finally:
+                app.state_bus.unsubscribe(subscriber)
+
+        def write_event(self, payload):
+            data = json.dumps(payload, ensure_ascii=False)
+            self.wfile.write(f"data: {data}\n\n".encode("utf-8"))
+            self.wfile.flush()
+
+        def write_json(self, payload, status=200):
+            data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+
+        def log_message(self, format, *args):
+            return
+
+    return ControlHandler
+
+
+def start_control_server(app, host="127.0.0.1", port=8765):
+    if not FRONTEND_PATH.exists():
+        raise FileNotFoundError(f"Frontend folder does not exist: {FRONTEND_PATH}")
+    server = ThreadingHTTPServer((host, port), make_control_handler(app))
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    return server
 
 
 def list_devices():
@@ -1093,6 +1437,8 @@ def main():
     parser.add_argument("--test-model", action="store_true", help="Run SenseVoice on bundled zh.mp3")
     parser.add_argument("--once", type=float, default=0, help="Record a fixed number of seconds, transcribe, then exit")
     parser.add_argument("--no-paste", action="store_true", help="Do not paste result into the active input")
+    parser.add_argument("--ui", action="store_true", help="Start the local web control panel")
+    parser.add_argument("--ui-port", type=int, default=8765, help="Port for the local web control panel")
     args = parser.parse_args()
 
     CONFIG_PATH = Path(args.config)
@@ -1108,9 +1454,24 @@ def main():
             config["noise_suppression_enabled"] = choose_noise_suppression_mode(config)
             record_once(config, args.once, not args.no_paste)
         else:
+            if args.ui:
+                config["prompt_audio_processing_on_start"] = False
+                config["prompt_noise_suppression_on_start"] = False
+                config["prompt_asr_device_on_start"] = False
+                config["prompt_asr_engine_on_start"] = False
+                config["prompt_text_optimizer_on_start"] = False
             config["audio_processing_enabled"] = choose_audio_processing_mode(config)
             config["noise_suppression_enabled"] = choose_noise_suppression_mode(config)
-            ImeApp(config).start()
+            app = ImeApp(config)
+            if args.ui:
+                server = start_control_server(app, port=args.ui_port)
+                url = f"http://127.0.0.1:{args.ui_port}/?connect=1"
+                print(f"[ui] control panel: {url}")
+                try:
+                    webbrowser.open(url)
+                except Exception:
+                    pass
+            app.start()
     except MissingDependency as exc:
         print(f"[dependency] {exc}")
         return 2
