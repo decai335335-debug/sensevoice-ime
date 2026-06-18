@@ -112,12 +112,12 @@ MODEL_DEFINITIONS = {
     },
     "qwen_0_6b_path": {
         "label": "Qwen3-0.6B",
-        "names": ["Qwen3-0.6B", "Qwen3-0___6B", "Qwen3-0_6B"],
+        "names": ["Qwen3-0.6B", "Qwen3-0___6B", "Qwen3-0_6B", "千问3-0.6B", "鍗冮棶3-0.6B"],
         "required": ["config.json"],
     },
     "qwen_1_7b_path": {
         "label": "Qwen3-1.7B",
-        "names": ["Qwen3-1.7B", "Qwen3-1___7B", "Qwen3-1_7B"],
+        "names": ["Qwen3-1.7B", "Qwen3-1___7B", "Qwen3-1_7B", "千问3-1.7B", "鍗冮棶3-1.7B"],
         "required": ["config.json"],
     },
     "qwen_asr_0_6b_path": {
@@ -282,9 +282,6 @@ def torch_cuda_available():
 def choose_device(config):
     device = str(config.get("device", "auto")).strip().lower()
     if device and device != "auto":
-        if device.startswith("cuda") and not torch_cuda_available():
-            print("[device] GPU selected, but current PyTorch cannot see CUDA; falling back to CPU.")
-            return "cpu"
         return device
     if torch_cuda_available():
         return "cuda:0"

@@ -9,11 +9,43 @@ import tkinter as tk
 from tkinter import messagebox
 from pathlib import Path
 
+
+def add_external_venv_site_packages():
+    """Let the desktop EXE use the portable .venv beside it."""
+    candidates = []
+    if getattr(sys, "frozen", False):
+        exe_dir = Path(sys.executable).resolve().parent
+        candidates.extend([exe_dir, *exe_dir.parents])
+    script_dir = Path(__file__).resolve().parent
+    candidates.extend([script_dir, *script_dir.parents])
+    for base in candidates:
+        for env_name in (".venv", "venv"):
+            site_packages = base / env_name / "Lib" / "site-packages"
+            if site_packages.exists():
+                site_path = str(site_packages)
+                if site_path not in sys.path:
+                    sys.path.insert(0, site_path)
+                return
+
+
+add_external_venv_site_packages()
 import sensevoice_ime as core
 
 
 INSTANCE_MUTEX = None
 INSTANCE_SOCKET = None
+
+
+def app_root():
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parent
+
+
+APP_ROOT = app_root()
+core.CONFIG_PATH = APP_ROOT / "config.json"
+core.PHRASES_PATH = APP_ROOT / "phrases.json"
+core.RAW_TRANSCRIPTS_PATH = APP_ROOT / "raw_transcripts.jsonl"
 
 
 def dpi_awareness():
@@ -24,6 +56,42 @@ def dpi_awareness():
             ctypes.windll.user32.SetProcessDPIAware()
         except Exception:
             pass
+
+
+def set_app_user_model_id():
+    try:
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("SenseVoiceIME.Desktop")
+    except Exception:
+        pass
+
+
+def apply_window_icons(root):
+    try:
+        root.iconbitmap(str(APP_ICON))
+    except Exception:
+        pass
+    try:
+        root.iconphoto(True, tk.PhotoImage(file=str(APP_ICON.with_suffix(".png"))))
+    except Exception:
+        pass
+    try:
+        hwnd = root.winfo_id()
+        image_icon = 1
+        load_from_file = 0x10
+        lr_default_size = 0x40
+        large_icon = ctypes.windll.user32.LoadImageW(
+            None, str(APP_ICON), image_icon, 32, 32, load_from_file | lr_default_size
+        )
+        small_icon = ctypes.windll.user32.LoadImageW(
+            None, str(APP_ICON), image_icon, 16, 16, load_from_file | lr_default_size
+        )
+        wm_seticon = 0x0080
+        if large_icon:
+            ctypes.windll.user32.SendMessageW(hwnd, wm_seticon, 1, large_icon)
+        if small_icon:
+            ctypes.windll.user32.SendMessageW(hwnd, wm_seticon, 0, small_icon)
+    except Exception:
+        pass
 
 
 def ensure_single_instance():
@@ -57,7 +125,7 @@ WARNING = "#e69b2f"
 LINE = "#dfe7e8"
 LOG_BG = "#101416"
 LOG_FG = "#dfe7e8"
-APP_ICON = Path(__file__).with_name("assets") / "sensevoice.ico"
+APP_ICON = APP_ROOT / "assets" / "sensevoice.ico"
 FONT_UI = "Microsoft YaHei UI"
 FONT_LATIN = "Segoe UI"
 
@@ -196,13 +264,11 @@ class FloatingWindow(tk.Toplevel):
 
 class DesktopApp:
     def __init__(self):
+        set_app_user_model_id()
         dpi_awareness()
         self.root = tk.Tk()
         self.root.title("SenseVoice IME")
-        try:
-            self.root.iconbitmap(str(APP_ICON))
-        except Exception:
-            pass
+        apply_window_icons(self.root)
         self.root.geometry("1240x840")
         self.root.minsize(1040, 720)
         self.root.configure(bg=BG)
