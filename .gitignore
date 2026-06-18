@@ -6,3 +6,7 @@ __pycache__/
 model/
 raw_transcripts.jsonl
 *.local.jsonl
+程序版/
+build/
+dist/
+*.spec
